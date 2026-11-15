@@ -51,14 +51,14 @@
         </div>
 
         <!-- PHOTO VIEWER CONTENT -->
-        {% if media.type == 'photo' %}
+        {% if media.type == 'photo' or media.media_type == 'photo' %}
         <div class="photo-viewer-card">
             <div class="photo-display-wrap">
-                <img src="{{ url_for('serve_media_file', media_id=media.id) }}" alt="{{ media.title or media.original_name }}" class="photo-display-img">
+                <img src="{{ media_file_url or url_for('serve_media_file', media_id=media.id) }}" alt="{{ media.title or media.original_name }}" class="photo-display-img">
             </div>
             <div class="media-footer-bar">
                 <span class="media-filename-info">{{ media.original_name }} ({{ formatted_size }})</span>
-                <a href="{{ url_for('serve_media_file', media_id=media.id) }}" download="{{ media.original_name }}" class="btn btn-secondary btn-xs">
+                <a href="{{ media_file_url or url_for('serve_media_file', media_id=media.id) }}" download="{{ media.original_name }}" class="btn btn-secondary btn-xs">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                     Save Photo
                 </a>
@@ -70,7 +70,7 @@
         <div class="video-viewer-wrapper">
             <div class="video-frame-container">
                 <video id="mainVideoPlayer" class="main-video-player" controls preload="metadata" playsinline>
-                    <source src="{{ url_for('serve_media_file', media_id=media.id) }}" type="{{ media.mime_type }}">
+                    <source src="{{ media_file_url or url_for('serve_media_file', media_id=media.id) }}" type="{{ media.mime_type }}">
                     Your browser does not support HTML5 video playback.
                 </video>
             </div>

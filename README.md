@@ -209,12 +209,38 @@ python verify_live.py
 | `GET /qr-image/<filename>` | `GET` | Serves QR code image from `qr_codes/` directory. |
 | `POST /generate-qr` | `POST` | Regenerates QR code with a new color palette without changing the media link. |
 | `GET /my-codes` | `GET` | Web dashboard to view and manage previously generated QR codes. |
-| `POST /api/media/<media_id>/delete` | `POST` | Permanently deletes media file, QR code, and JSON metadata record after creator token validation. |
+| `POST /api/media/<media_id>/delete` | `POST` | Permanently deletes media file, QR code, and metadata after creator token validation. |
 | `GET /api/media/<media_id>` | `GET` | Returns public media metadata as JSON. |
+| `POST /api/admin/regenerate-qr-codes` | `POST` | Batch regenerates all QR codes to a new or effective public URL while preserving media IDs and files. |
 
 ---
 
-## 9. Production Deployment Guide
+## 9. QR Code URL Resolution & LAN Accessibility
+
+QR codes generated on desktop browsers must be scannable by mobile devices without failing due to loopback addresses (`127.0.0.1` or `localhost`). LensQR uses an intelligent multi-tier URL resolution engine:
+
+### Resolution Priority Hierarchy
+1. **`PUBLIC_URL`**: Explicit custom domain configured in `.env` (e.g. `https://qr.lensqr.net`). Recommended for all production environments.
+2. **`RENDER_EXTERNAL_URL`**: Automatically supplied by Render cloud platform (e.g. `https://lensqr.onrender.com`). Ensured with `https://`.
+3. **`DEV_PUBLIC_URL`**: Local tunnel or reverse proxy URL (e.g. ngrok or localtunnel: `https://my-tunnel.loca.lt`).
+4. **Non-Loopback Host Header**: If the client accesses via LAN IP or public domain, that host is preserved.
+5. **Local Network LAN IP (`get_lan_ip()`)**: During local development without `PUBLIC_URL`, Flask binds to `0.0.0.0` and automatically resolves the machine's Wi-Fi / Ethernet LAN IP (e.g. `http://192.168.1.50:5000`). QR codes generated on localhost encode this LAN IP so phones connected to the same Wi-Fi can immediately scan and view media.
+
+### Batch QR Code Regeneration
+To update existing QR codes (e.g., when transitioning from local development to production or updating your domain) without re-uploading media:
+
+```bash
+# Auto-detects effective URL
+python regenerate_qr_codes.py
+
+# Or explicitly specify target production domain:
+python regenerate_qr_codes.py --url https://qr.lensqr.net
+```
+All existing media IDs, titles, descriptions, and uploaded media files are strictly preserved.
+
+---
+
+## 10. Production Deployment Guide
 
 ### Deployment on Linux VPS / Cloud (Ubuntu / Debian)
 

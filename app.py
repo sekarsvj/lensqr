@@ -3,7 +3,7 @@ import secrets
 from datetime import datetime
 from flask import (
     Flask, render_template, request, jsonify,
-    url_for, send_from_directory, abort, session
+    url_for, send_from_directory, abort, session, redirect
 )
 from werkzeug.exceptions import RequestEntityTooLarge
 
@@ -11,7 +11,8 @@ from config import Config
 from database.database import initialize_storage, get_media, format_file_size
 from services.media_service import (
     create_media, update_media_qr_style,
-    delete_media_and_files, format_media_dict
+    delete_media_and_files, format_media_dict,
+    get_signed_media_url, regenerate_all_qr_codes
 )
 from services.qr_service import STYLE_PALETTES
 
@@ -48,12 +49,25 @@ def create_app(test_config=None):
 
         initialize_storage()
 
+        if Config.is_supabase_configured():
+            try:
+                from services.storage_service import ensure_storage_bucket
+                ensure_storage_bucket()
+            except Exception as se:
+                app.logger.warning(
+                    f"Supabase bucket initialization deferred: {se}"
+                )
+
     def get_public_base_url():
-        """Determine base public URL for encoded QR targets."""
-        configured_url = app.config.get('PUBLIC_URL')
-        if configured_url:
-            return configured_url.rstrip('/')
-        return request.host_url.rstrip('/')
+        """
+        Determine base public URL for encoded QR targets.
+        Resolves via resolve_public_base_url to avoid loopback localhost issues.
+        """
+        from config import resolve_public_base_url
+        configured = app.config.get('PUBLIC_URL')
+        if configured:
+            return configured.rstrip('/')
+        return resolve_public_base_url(request)
 
     @app.before_request
     def csrf_protection():
@@ -261,10 +275,12 @@ def create_app(test_config=None):
         )
 
     @app.route('/m/<media_id>')
+    @app.route('/view/<media_id>')
     def media_viewer(media_id):
         """
         Public unlisted media viewer page.
         Displays photograph or plays video. Does not require login or app.
+        Generates fresh short-lived signed URL from Supabase Storage.
         """
         record = get_media(media_id)
         if not record:
@@ -278,11 +294,16 @@ def create_app(test_config=None):
             formatted_date = 'Recently'
 
         base_url = get_public_base_url()
+        signed_media_url = get_signed_media_url(record)
+
         return render_template(
             'viewer.html',
             media=record,
             base_url=base_url,
-            formatted_size=format_file_size(record.get('size_bytes', 0)),
+            media_file_url=signed_media_url,
+            formatted_size=format_file_size(
+                record.get('size_bytes') or record.get('file_size') or 0
+            ),
             created_date=formatted_date
         )
 
@@ -290,14 +311,25 @@ def create_app(test_config=None):
     def serve_media_file(media_id):
         """
         Safely serve media file (photo or video) with HTTP Range support for
-        seeking.
+        seeking. Redirects to short-lived signed URL when Supabase is
+        configured.
         """
         record = get_media(media_id)
         if not record:
             abort(404)
 
+        # When Supabase is configured, stream directly via signed URL
+        if Config.is_supabase_configured():
+            signed_url = get_signed_media_url(record)
+            if signed_url:
+                return redirect(signed_url, code=307)
+
         safe_filename = os.path.basename(record['filename'])
-        if record['type'] == 'photo':
+        is_photo = (
+            record.get('type') == 'photo' or
+            record.get('media_type') == 'photo'
+        )
+        if is_photo:
             folder = app.config.get(
                 'UPLOAD_FOLDER_PHOTOS',
                 Config.UPLOAD_FOLDER_PHOTOS)
@@ -412,7 +444,7 @@ def create_app(test_config=None):
                 provided_token = record['creator_token']
 
         success, message, code = delete_media_and_files(
-            media_id, provided_token)
+            media_id, provided_token or '')
         if success:
             tokens = session.get('creator_tokens', [])
             if provided_token in tokens:
@@ -424,11 +456,35 @@ def create_app(test_config=None):
         else:
             return jsonify({'success': False, 'error': message}), code
 
+    @app.route('/api/admin/regenerate-qr-codes', methods=['POST'])
+    def batch_regenerate_qr():
+        """
+        Batch regenerate existing QR codes with effective or specified URL.
+        Preserves existing media IDs and files.
+        """
+        target_url = None
+        if request.is_json and request.json:
+            target_url = request.json.get('base_url')
+        elif request.form.get('base_url'):
+            target_url = request.form.get('base_url')
+
+        res = regenerate_all_qr_codes(new_base_url=target_url)
+        return jsonify(res), (200 if res.get('success') else 500)
+
     return app
 
 
 app = create_app()
 
 if __name__ == '__main__':
+    from config import get_lan_ip, resolve_public_base_url
     port = int(os.environ.get('PORT', 5000))
+    lan_ip = get_lan_ip()
+    target_pub = resolve_public_base_url()
+    print("=" * 65)
+    print("  LensQR Photo & Video QR Generator")
+    print(f"  * Local PC Access:    http://127.0.0.1:{port}")
+    print(f"  * Mobile/LAN Access:  http://{lan_ip}:{port}")
+    print(f"  * QR Codes Will Use:  {target_pub}")
+    print("=" * 65)
     app.run(host='0.0.0.0', port=port, debug=True)

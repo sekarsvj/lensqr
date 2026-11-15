@@ -153,6 +153,9 @@ def save_uploaded_file(file_storage, media_type):
 
     # Generate cryptographically secure random server filename
     safe_filename = f"{uuid.uuid4().hex}.{ext}"
+    subfolder = 'photos' if media_type == 'photo' else 'videos'
+    storage_path = f"{subfolder}/{safe_filename}"
+
     target_dir = (
         Config.UPLOAD_FOLDER_PHOTOS if media_type == 'photo'
         else Config.UPLOAD_FOLDER_VIDEOS
@@ -178,18 +181,31 @@ def save_uploaded_file(file_storage, media_type):
         elif ext == 'webm':
             mime_type = 'video/webm'
 
+    # Sync to Supabase Storage if configured
+    try:
+        from services.storage_service import upload_media_to_storage
+        with open(dest_path, 'rb') as f:
+            upload_media_to_storage(f.read(), storage_path, mime_type)
+    except Exception as e:
+        print(f"Warning: Could not sync {storage_path} to Supabase: {e}")
+
     return {
         'filename': safe_filename,
+        'storage_path': storage_path,
         'original_name': clean_original[:120],
         'file_size': file_size,
         'mime_type': mime_type
     }
 
 
-def delete_uploaded_file(filename, media_type):
-    """Safely delete an uploaded file from disk."""
+def delete_uploaded_file(filename, media_type, storage_path=None):
+    """
+    Safely delete an uploaded file from disk and private Supabase Storage.
+    """
     if not filename:
         return
+
+    # Delete from local filesystem
     folder = (
         Config.UPLOAD_FOLDER_PHOTOS if media_type == 'photo'
         else Config.UPLOAD_FOLDER_VIDEOS
@@ -201,3 +217,12 @@ def delete_uploaded_file(filename, media_type):
             os.remove(path)
         except Exception as e:
             print(f"Error deleting file {path}: {e}")
+
+    # Delete from Supabase Storage
+    try:
+        from services.storage_service import delete_from_storage
+        subfolder = 'photos' if media_type == 'photo' else 'videos'
+        target_path = storage_path or f"{subfolder}/{safe_name}"
+        delete_from_storage(target_path)
+    except Exception as e:
+        print(f"Warning: Could not delete {filename} from Supabase: {e}")

@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: lensqr-app
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 2 --threads 4 --timeout 120 app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SECRET_KEY
+        generateValue: true
+      - key: BRAND_NAME
+        value: LensQR
+      - key: PUBLIC_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: qr-media
+      - key: MAX_PHOTO_MB
+        value: "25"
+      - key: MAX_VIDEO_MB
+        value: "100"
