@@ -1,0 +1,27 @@
+# Environments
+.venv/
+env/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local environment variables
+.env
+
+# Backups
+backup_v1/
+
+# Test sandboxes
+test_*_sandbox/
+
+# Uploaded media & generated QR codes (keep folders, ignore contents)
+uploads/photos/*
+!uploads/photos/.gitkeep
+uploads/videos/*
+!uploads/videos/.gitkeep
+qr_codes/*
+!qr_codes/.gitkeep

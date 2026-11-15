@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}QR Code Ready | {{ media.title or media.original_name }} - {{ brand_name }}{% endblock %}
+
+{% block content %}
+<section class="result-section">
+    <div class="result-container">
+        
+        <!-- Header status -->
+        <div class="result-header text-center">
+            <div class="success-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>QR Code Generated Successfully</span>
+            </div>
+            <h1 class="result-title">{{ media.title or media.original_name }}</h1>
+            <p class="result-subtitle">Your media is ready for sharing. Scan with any smartphone camera or copy the unlisted link.</p>
+        </div>
+
+        <div class="result-grid">
+            
+            <!-- LEFT: QR Code Display Card -->
+            <div class="qr-display-card">
+                <div class="qr-frame" id="qrFrame">
+                    <img src="{{ url_for('serve_qr_image', filename=media.qr_filename) }}" alt="Generated QR Code" id="resultQrImage" class="qr-image">
+                    <div class="qr-loading-overlay" id="qrLoadingOverlay" style="display: none;">
+                        <div class="spinner"></div>
+                        <span>Updating design...</span>
+                    </div>
+                </div>
+
+                <div class="qr-actions">
+                    <a href="{{ url_for('download_qr', media_id=media.id) }}" class="btn btn-primary btn-block" id="downloadQrBtn" download>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        <span>Download QR Code (PNG)</span>
+                    </a>
+                    
+                    <a href="{{ media_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-block">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                        <span>Preview Media</span>
+                    </a>
+                </div>
+
+                <div class="scan-instruction">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
+                    <span>Point any smartphone camera to scan</span>
+                </div>
+            </div>
+
+            <!-- RIGHT: Media Details, Shareable Link & QR Customizer -->
+            <div class="result-details-card">
+                
+                <!-- Shareable Link Box -->
+                <div class="detail-block">
+                    <label class="detail-label">Shareable Media URL</label>
+                    <div class="copy-url-group">
+                        <input type="text" class="copy-input" id="shareUrlInput" value="{{ media_url }}" readonly>
+                        <button type="button" class="btn btn-secondary" id="copyUrlBtn" title="Copy to clipboard">
+                            <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            <span class="copy-text">Copy Link</span>
+                        </button>
+                    </div>
+                    <span class="url-hint">This unlisted link is directly accessible to anyone with the QR code.</span>
+                </div>
+
+                <!-- Media Information -->
+                <div class="detail-block">
+                    <label class="detail-label">Media Information</label>
+                    <div class="meta-specs-grid">
+                        <div class="spec-card">
+                            <span class="spec-name">Original File</span>
+                            <span class="spec-value truncate" title="{{ media.original_name }}">{{ media.original_name }}</span>
+                        </div>
+                        <div class="spec-card">
+                            <span class="spec-name">Media Type</span>
+                            <span class="spec-value capitalize">{{ media.type }}</span>
+                        </div>
+                        <div class="spec-card">
+                            <span class="spec-name">File Size</span>
+                            <span class="spec-value">{{ formatted_size }}</span>
+                        </div>
+                        <div class="spec-card">
+                            <span class="spec-name">Created Date</span>
+                            <span class="spec-value">{{ created_date }}</span>
+                        </div>
+                    </div>
+                    {% if media.description %}
+                    <div class="meta-desc-box">
+                        <strong>Description / Note:</strong>
+                        <p>{{ media.description }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- QR Style Palette Customizer -->
+                <div class="detail-block">
+                    <div class="style-header-row">
+                        <label class="detail-label">QR Code Color Theme</label>
+                        <span class="style-subtitle">Changes design without altering the media link</span>
+                    </div>
+                    
+                    <div class="style-picker" id="resultStylePicker" data-media-id="{{ media.id }}">
+                        {% for key, val in qr_styles.items() %}
+                        <button type="button" class="style-pill {% if media.qr_style == key %}active{% endif %}" data-style="{{ key }}">
+                            <span class="pill-dot" style="background-color: {{ val.fill_color }};"></span>
+                            <span class="pill-label">{{ val.name }}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Navigation & Creator Actions -->
+                <div class="detail-block action-footer-block">
+                    <div class="creator-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span>Saved to your browser's QR management history</span>
+                    </div>
+                    <div class="result-nav-buttons">
+                        <a href="{{ url_for('my_codes_page') }}" class="btn btn-secondary btn-sm">View in My Codes</a>
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary btn-sm">Create Another QR</a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        saveMediaToLocalStorage({
+            mediaId: "{{ media.id }}",
+            creatorToken: "{{ media.creator_token }}",
+            title: "{{ media.title or media.original_name }}",
+            originalName: "{{ media.original_name }}",
+            mediaType: "{{ media.type }}",
+            sizeFormatted: "{{ formatted_size }}",
+            createdAt: "{{ media.created_at }}",
+            qrUrl: "{{ url_for('serve_qr_image', filename=media.qr_filename) }}",
+            mediaUrl: "{{ media_url }}"
+        });
+    });
+</script>
+{% endblock %}

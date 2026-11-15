@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}500 - Server Error | {{ brand_name }}{% endblock %}
+
+{% block content %}
+<section class="error-section text-center">
+    <div class="error-container">
+        <div class="error-badge error-badge-danger">500 Server Error</div>
+        <h1 class="error-title">Something Went Wrong</h1>
+        <p class="error-subtitle">
+            An unexpected error occurred while processing your request. Please try again or return to the homepage.
+        </p>
+        <div class="error-actions">
+            <a href="{{ url_for('index') }}" class="btn btn-primary btn-md">
+                <span>Back to Home</span>
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}

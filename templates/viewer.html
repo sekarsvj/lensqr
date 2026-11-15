@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}{{ media.title or media.original_name }} | {{ brand_name }} Viewer{% endblock %}
+
+{% block content %}
+<section class="viewer-section">
+    <div class="viewer-container">
+        
+        <!-- Viewer Header Bar -->
+        <div class="viewer-header">
+            <div class="viewer-header-left">
+                <div class="viewer-type-pill">
+                    {% if media.type == 'photo' %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span>Photograph</span>
+                    {% else %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                    <span>Video</span>
+                    {% endif %}
+                </div>
+                <h1 class="viewer-title">{{ media.title or media.original_name }}</h1>
+                {% if media.description %}
+                <p class="viewer-description">{{ media.description }}</p>
+                {% endif %}
+                <div class="viewer-meta-row">
+                    <span class="meta-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        Uploaded {{ created_date }}
+                    </span>
+                    <span class="meta-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        Size: {{ formatted_size }}
+                    </span>
+                    <span class="meta-item unlisted-badge">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        Unlisted Media
+                    </span>
+                </div>
+            </div>
+
+            <div class="viewer-header-actions">
+                <a href="{{ url_for('serve_media_file', media_id=media.id) }}" download="{{ media.original_name }}" class="btn btn-secondary btn-sm" title="Download original file">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <span>Download</span>
+                </a>
+                <a href="{{ url_for('index') }}" class="btn btn-primary btn-sm">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    <span>Create Your Own QR</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- PHOTO VIEWER CONTENT -->
+        {% if media.type == 'photo' %}
+        <div class="photo-viewer-card">
+            <div class="photo-display-wrap">
+                <img src="{{ url_for('serve_media_file', media_id=media.id) }}" alt="{{ media.title or media.original_name }}" class="photo-display-img">
+            </div>
+            <div class="media-footer-bar">
+                <span class="media-filename-info">{{ media.original_name }} ({{ formatted_size }})</span>
+                <a href="{{ url_for('serve_media_file', media_id=media.id) }}" download="{{ media.original_name }}" class="btn btn-secondary btn-xs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Save Photo
+                </a>
+            </div>
+        </div>
+
+        <!-- VIDEO VIEWER CONTENT -->
+        {% else %}
+        <div class="video-viewer-wrapper">
+            <div class="video-frame-container">
+                <video id="mainVideoPlayer" class="main-video-player" controls preload="metadata" playsinline>
+                    <source src="{{ url_for('serve_media_file', media_id=media.id) }}" type="{{ media.mime_type }}">
+                    Your browser does not support HTML5 video playback.
+                </video>
+            </div>
+
+            <div class="video-details-bar">
+                <div class="video-details-left">
+                    <span class="video-detail-title">{{ media.original_name }}</span>
+                    <span class="video-detail-info">Format: {{ media.mime_type }} • {{ formatted_size }}</span>
+                </div>
+                <div class="video-details-right">
+                    <a href="{{ url_for('serve_media_file', media_id=media.id) }}" download="{{ media.original_name }}" class="btn btn-secondary btn-sm">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        <span>Download Video</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Bottom Privacy & Sharing Notice -->
+        <div class="viewer-footer-notice">
+            <div class="notice-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            </div>
+            <div class="notice-text">
+                <strong>Unlisted Access:</strong> This media is hosted on an unlisted URL. It cannot be discovered through search engine indexes, but anyone with the link or QR code can view and download the media.
+            </div>
+        </div>
+
+    </div>
+</section>
+{% endblock %}

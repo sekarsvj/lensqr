@@ -1,0 +1,16 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "include": [
+    "app.py",
+    "config.py",
+    "database",
+    "services",
+    "tests",
+    "verify_live.py"
+  ],
+  "exclude": [
+    ".venv",
+    "backup_v1"
+  ]
+}

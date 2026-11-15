@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}404 - Media Not Found | {{ brand_name }}{% endblock %}
+
+{% block content %}
+<section class="error-section text-center">
+    <div class="error-container">
+        <div class="error-badge">404 Error</div>
+        <h1 class="error-title">Media Not Found or Deleted</h1>
+        <p class="error-subtitle">
+            The media or QR code you requested does not exist, or the creator has permanently removed it.
+        </p>
+        <div class="error-actions">
+            <a href="{{ url_for('index') }}" class="btn btn-primary btn-md">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Create New QR Code</span>
+            </a>
+            <a href="{{ url_for('my_codes_page') }}" class="btn btn-secondary btn-md">
+                <span>View My QR Codes</span>
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}
