@@ -179,20 +179,6 @@ def create_app(test_config=None):
         """Homepage: Photo & Video QR Generator Studio."""
         return render_template('index.html')
 
-    @app.route('/debug')
-    def debug():
-        return jsonify({
-            'path': request.path,
-            'full_path': request.full_path,
-            'PATH_INFO': request.environ.get('PATH_INFO'),
-            'REQUEST_URI': request.environ.get('REQUEST_URI'),
-            'RAW_URI': request.environ.get('RAW_URI'),
-            'HTTP_X_FORWARDED_PATH': request.environ.get('HTTP_X_FORWARDED_PATH'),
-            'HTTP_X_MATCHED_PATH': request.environ.get('HTTP_X_MATCHED_PATH'),
-            'HTTP_X_VERCEL_PATH': request.environ.get('HTTP_X_VERCEL_PATH'),
-            'relevant_keys': {k: request.environ.get(k) for k in request.environ.keys() if any(w in k for w in ['PATH', 'URI', 'VERCEL', 'MATCH', 'ROUTE'])}
-        })
-
     @app.route('/upload/photo', methods=['POST'])
     def upload_photo():
         """Upload one photograph and generate QR code."""
