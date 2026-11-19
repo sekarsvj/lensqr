@@ -78,6 +78,8 @@ def _normalize_db_record(row: Any) -> Dict[str, Any]:
     storage_path = (
         row.get("storage_path") or row.get("filename") or ""
     )
+    if storage_path.startswith("documents/") or (row.get("mime_type") and not row.get("mime_type").startswith(("image/", "video/"))):
+        media_type = "document"
     local_filename = os.path.basename(storage_path) if storage_path else ""
     original_name = (
         row.get("original_filename") or row.get("original_name") or ""
@@ -91,7 +93,7 @@ def _normalize_db_record(row: Any) -> Dict[str, Any]:
         "type": media_type,
         "media_type": media_type,
         "title": row.get("title") or (
-            "Photo" if media_type == "photo" else "Video"
+            "Photo" if media_type == "photo" else ("Video" if media_type == "video" else "Document")
         ),
         "description": row.get("description") or "",
         "original_name": original_name,
@@ -155,6 +157,28 @@ def save_media_to_db(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             return _normalize_db_record(res.data[0])
         return _normalize_db_record(row_data)
     except Exception as e:
+        err_msg = str(e)
+        if "media_media_type_check" in err_msg and media_type == "document":
+            logger.warning(
+                "Remote Supabase DB has legacy media_type constraint. "
+                "Saving document with DB-fallback media_type='photo' and documents storage_path."
+            )
+            try:
+                fallback_data = dict(row_data)
+                fallback_data["media_type"] = "photo"
+                res = client.table("media").upsert(fallback_data).execute()
+                if res.data and len(res.data) > 0:
+                    norm = _normalize_db_record(res.data[0])
+                    norm["type"] = "document"
+                    norm["media_type"] = "document"
+                    return norm
+                norm = _normalize_db_record(fallback_data)
+                norm["type"] = "document"
+                norm["media_type"] = "document"
+                return norm
+            except Exception as inner_e:
+                logger.error(f"Fallback save to Supabase also failed: {inner_e}")
+                return None
         logger.error(
             f"Failed to save media {record.get('id')} to Supabase: {e}"
         )

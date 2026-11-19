@@ -13,15 +13,18 @@ class TestUpload(unittest.TestCase):
         self.test_dir = os.path.join(Config.BASE_DIR, 'test_upload_sandbox')
         self.photos_dir = os.path.join(self.test_dir, 'photos')
         self.videos_dir = os.path.join(self.test_dir, 'videos')
+        self.docs_dir = os.path.join(self.test_dir, 'documents')
         self.qr_dir = os.path.join(self.test_dir, 'qr_codes')
         self.test_json = os.path.join(self.test_dir, 'media.json')
 
         os.makedirs(self.photos_dir, exist_ok=True)
         os.makedirs(self.videos_dir, exist_ok=True)
+        os.makedirs(self.docs_dir, exist_ok=True)
         os.makedirs(self.qr_dir, exist_ok=True)
 
         Config.UPLOAD_FOLDER_PHOTOS = self.photos_dir
         Config.UPLOAD_FOLDER_VIDEOS = self.videos_dir
+        Config.UPLOAD_FOLDER_DOCUMENTS = self.docs_dir
         Config.QR_FOLDER = self.qr_dir
         Config.JSON_STORAGE_PATH = self.test_json
 
@@ -31,10 +34,12 @@ class TestUpload(unittest.TestCase):
             'TESTING': True,
             'UPLOAD_FOLDER_PHOTOS': self.photos_dir,
             'UPLOAD_FOLDER_VIDEOS': self.videos_dir,
+            'UPLOAD_FOLDER_DOCUMENTS': self.docs_dir,
             'QR_FOLDER': self.qr_dir,
             'JSON_STORAGE_PATH': self.test_json,
             'MAX_PHOTO_MB': 5,
-            'MAX_VIDEO_MB': 10
+            'MAX_VIDEO_MB': 10,
+            'MAX_DOCUMENT_MB': 50
         })
         self.client = self.app.test_client()
 
@@ -62,6 +67,20 @@ class TestUpload(unittest.TestCase):
             vid_io.write(b'\x1A\x45\xDF\xA3' + b'\x00' * 512)
         vid_io.seek(0)
         return vid_io
+
+    def create_dummy_document(self, fmt='pdf'):
+        """Create valid document file bytes."""
+        doc_io = io.BytesIO()
+        if fmt == 'pdf':
+            doc_io.write(b'%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n>>\nendobj\ntrailer\n<<\n>>\n%%EOF\n')
+        elif fmt in ['docx', 'xlsx', 'pptx', 'zip']:
+            doc_io.write(b'PK\x03\x04\x14\x00\x00\x00\x08\x00' + b'\x00' * 128)
+        elif fmt in ['doc', 'xls', 'ppt']:
+            doc_io.write(b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1' + b'\x00' * 128)
+        else:
+            doc_io.write(b'Sample text document content')
+        doc_io.seek(0)
+        return doc_io
 
     def get_csrf(self):
         self.client.get('/')
@@ -160,6 +179,85 @@ class TestUpload(unittest.TestCase):
         }, headers={'X-CSRFToken': csrf}, content_type='multipart/form-data')
         self.assertEqual(res.status_code, 400)
         self.assertIn(b'empty', res.data)
+
+
+    def test_upload_document_formats(self):
+        """Test PDF, Word, Excel, PowerPoint, Text, and Zip document uploads."""
+        csrf = self.get_csrf()
+
+        for fmt in ['pdf', 'docx', 'doc', 'xlsx', 'txt', 'zip']:
+            doc = self.create_dummy_document(fmt)
+            res = self.client.post(
+                '/upload/document',
+                data={
+                    'csrf_token': csrf,
+                    'file': (doc, f'sample.{fmt}'),
+                    'title': f'Test {fmt.upper()} Document'
+                },
+                headers={'X-CSRFToken': csrf},
+                content_type='multipart/form-data'
+            )
+
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertTrue(data['success'])
+            self.assertEqual(data['media_type'], 'document')
+            self.assertIn('media_url', data)
+            self.assertIn('qr_url', data)
+
+            # Verify in JSON database
+            record = database.get_media(data['media_id'])
+            self.assertIsNotNone(record)
+            assert record is not None
+            self.assertEqual(record['type'], 'document')
+            self.assertEqual(record['title'], f'Test {fmt.upper()} Document')
+
+    def test_document_viewer_and_download(self):
+        """Test document viewer page renders and file can be downloaded."""
+        csrf = self.get_csrf()
+        doc = self.create_dummy_document('pdf')
+
+        res = self.client.post(
+            '/upload/document',
+            data={
+                'csrf_token': csrf,
+                'file': (doc, 'invoice.pdf'),
+                'title': 'Invoice Q4'
+            },
+            headers={'X-CSRFToken': csrf},
+            content_type='multipart/form-data'
+        )
+        data = res.get_json()
+        media_id = data['media_id']
+
+        # Viewer page request
+        view_res = self.client.get(f'/m/{media_id}')
+        self.assertEqual(view_res.status_code, 200)
+        self.assertIn(b'Invoice Q4', view_res.data)
+        self.assertIn(b'Document', view_res.data)
+
+        # File download request
+        file_res = self.client.get(f'/media-file/{media_id}')
+        self.assertIn(file_res.status_code, [200, 307])
+        if file_res.status_code == 200:
+            self.assertEqual(file_res.mimetype, 'application/pdf')
+
+    def test_reject_executable_binary_in_document(self):
+        """Test rejection of executable file uploaded as document."""
+        csrf = self.get_csrf()
+        exe_file = io.BytesIO(b'MZ\x90\x00' + b'\x00' * 128)
+
+        res = self.client.post(
+            '/upload/document',
+            data={
+                'csrf_token': csrf,
+                'file': (exe_file, 'dangerous.pdf')
+            },
+            headers={'X-CSRFToken': csrf},
+            content_type='multipart/form-data'
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn(b'not permitted', res.data)
 
 
 if __name__ == '__main__':

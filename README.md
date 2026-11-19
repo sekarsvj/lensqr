@@ -8,9 +8,10 @@ Designed with a clean, minimal SaaS aesthetic, responsive layouts, client-side u
 
 ## 1. Overview & Architecture
 
-The application is dedicated exclusively to two types of media sharing:
+The application supports three types of media sharing:
 1. **Photo to QR Code**: Converts a single uploaded photograph (`.jpg`, `.jpeg`, `.png`, `.webp`) into an unlisted public viewing URL and generates a downloadable QR code.
 2. **Video to QR Code**: Converts a single uploaded video (`.mp4`, `.mov`, `.webm`) into an unlisted public viewing URL with an HTML5 video player and generates a downloadable QR code.
+3. **Document to QR Code**: Converts any uploaded document (`.pdf`, `.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`, `.pptx`, `.txt`, `.csv`, `.zip`, `.rar`, etc.) into an unlisted viewing URL with interactive PDF inline preview, format-specific document cards, and direct download buttons.
 
 ### Core Architecture Highlights
 - **Database-Free JSON Metadata Storage**: Uses `data/media.json` to persist metadata records. No SQLite, no PostgreSQL, no MySQL, no SQLAlchemy, and no external database services.
@@ -141,48 +142,134 @@ Available configuration options:
 
 ---
 
-## 6. Local Installation & Execution
+## 6. Local Installation & Global Access via Cloudflare Tunnel
 
-### Prerequisites
-- Python 3.10, 3.11, 3.12, 3.13, or 3.14
-- `pip` package manager
-
-### Step 1: Navigate to Project Directory
-```powershell
-cd "c:\qr generator"
-```
-
-### Step 2: Create and Activate Virtual Environment
-**Windows (PowerShell):**
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-**Linux / macOS:**
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### Step 3: Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### Step 4: Run the Application
-```powershell
-python app.py
-```
-
-### Step 5: Open in Web Browser
-Navigate to [http://localhost:5000](http://localhost:5000).
+### Why People Scanning from Punjab or Other Locations Cannot Access `localhost`
+When Flask runs on your computer at `http://localhost:5000` or `http://127.0.0.1:5000`, that address is a **loopback address** that exists *only inside your computer*.
+- A person scanning the QR code from another network (e.g., mobile 4G/5G, home Wi-Fi, or another city like Punjab) will have their phone try to connect to *their own phone's loopback*, which immediately fails with "Server not found" or "Connection refused".
+- **Solution**: Cloudflare Tunnel (`cloudflared`) connects your local Flask server to Cloudflare's secure global edge network, creating a public HTTPS URL (e.g. `https://your-tunnel.trycloudflare.com` or custom domain). When `PUBLIC_URL` is set to this address, all generated QR codes can be scanned and opened from anywhere in the world!
 
 ---
 
-## 7. Running Automated Tests
+### Method A: 1-Click Launch (Flask + Cloudflare Tunnel Together)
 
-Run the complete 18-test automated test suite:
+To launch both Flask (bound to `0.0.0.0:5000`) and Cloudflare Tunnel in one command:
+
+**Double-click `start_with_tunnel.bat`** OR run in PowerShell:
+```powershell
+python run_with_tunnel.py
+```
+
+This will automatically:
+1. Start Cloudflare Tunnel and display your assigned public HTTPS URL (e.g. `https://xxxx.trycloudflare.com`).
+2. Set `PUBLIC_URL` to that HTTPS address.
+3. Automatically regenerate existing QR codes so they point to the live tunnel URL.
+4. Start Flask securely on `0.0.0.0:5000` (with `debug=False`).
+
+---
+
+### Method B: Two Separate Terminals (Manual Control)
+
+#### Terminal 1: Start Flask Server
+```powershell
+# In project folder with virtual environment active
+python app.py
+```
+*Flask binds to `0.0.0.0:5000` with debug mode safely disabled for public traffic.*
+
+#### Terminal 2: Start Cloudflare Tunnel
+```powershell
+# Using the bundled cloudflared executable:
+.\cloudflared.exe tunnel --url http://127.0.0.1:5000
+
+# OR using the Python helper (which displays instructions and can auto-regenerate):
+python start_tunnel.py --regen
+```
+
+Copy the assigned HTTPS URL from the terminal output (e.g. `https://example-subdomain.trycloudflare.com`):
+1. Add it to your `.env` file:
+   ```env
+   PUBLIC_URL=https://example-subdomain.trycloudflare.com
+   ```
+2. Regenerate your existing QR codes so they point to this URL:
+   ```powershell
+   python regenerate_qr_codes.py --url https://example-subdomain.trycloudflare.com --save-env
+   ```
+
+---
+
+### Method C: Permanent Custom Domain with Named Cloudflare Tunnel
+
+Quick tunnels (`*.trycloudflare.com`) change URLs each time they are restarted. If you print QR codes on physical items or share them permanently, use a **Named Tunnel** with your own domain (e.g. `https://qr.yourdomain.com`):
+
+1. Login to Cloudflare CLI:
+   ```powershell
+   .\cloudflared.exe tunnel login
+   ```
+2. Create your tunnel:
+   ```powershell
+   .\cloudflared.exe tunnel create lensqr-tunnel
+   ```
+3. Route DNS to your custom domain:
+   ```powershell
+   .\cloudflared.exe tunnel route dns lensqr-tunnel qr.yourdomain.com
+   ```
+4. Configure `~/.cloudflared/config.yml`:
+   ```yaml
+   tunnel: <Tunnel-UUID>
+   credentials-file: C:\Users\<User>\.cloudflared\<Tunnel-UUID>.json
+   ingress:
+     - hostname: qr.yourdomain.com
+       service: http://127.0.0.1:5000
+     - service: http_status:404
+   ```
+5. Run the tunnel:
+   ```powershell
+   .\cloudflared.exe tunnel run lensqr-tunnel
+   ```
+6. Set in `.env`:
+   ```env
+   PUBLIC_URL=https://qr.yourdomain.com
+   ```
+7. Batch regenerate your QR codes once:
+   ```powershell
+   python regenerate_qr_codes.py --url https://qr.yourdomain.com --save-env
+   ```
+*Now your QR codes will never expire and will work permanently worldwide!*
+
+---
+
+### Batch QR Code Regeneration Tool
+
+To regenerate existing QR codes without modifying or re-uploading original media files:
+```powershell
+python regenerate_qr_codes.py --url https://your-public-url.com --save-env
+```
+- Preserves all media IDs, file contents, titles, and Supabase metadata.
+- Updates QR code PNG images locally and synchronizes them to Supabase Storage (`qr-media` bucket).
+
+---
+
+### Security & Reverse Proxy Hardening
+- **Debug Mode**: Flask debug mode is disabled by default (`debug=False`). The Werkzeug interactive debugger and tracebacks are never exposed on public URLs. To enable locally, explicitly set `FLASK_DEBUG=true`.
+- **ProxyFix Middleware**: Configured with `x_for=1, x_proto=1, x_host=1, x_port=1` so Flask correctly recognizes HTTPS schemes and hostnames passed by Cloudflare Tunnel.
+- **Cookies**: Session cookies automatically use `SameSite=Lax` and `HttpOnly=True` (`Secure=True` on HTTPS).
+- **Secrets**: Backend secrets (`SECRET_KEY`, `SUPABASE_SECRET_KEY`) are kept strictly on the backend and never exposed to clients.
+
+---
+
+## 7. Running Automated Tests & Live Verification
+
+### Run Full Unit Test Suite (31 Tests)
+```powershell
+python -m unittest discover tests -v
+```
+
+### Run Live External Cloudflare Tunnel Test
+```powershell
+python verify_external_tunnel.py
+```
+*Tests the entire round-trip across Cloudflare's public HTTPS edge, verifying HTTP 200 responses, viewer page rendering, media streaming, and QR accessibility from external networks.*
 
 ```powershell
 python -m unittest discover -s tests -v

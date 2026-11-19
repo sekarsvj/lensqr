@@ -72,11 +72,15 @@ class TestSupabaseIntegration(unittest.TestCase):
         self.assertEqual(normalized['id'], 'test-uuid-1234')
         self.assertEqual(normalized['type'], 'photo')
         self.assertEqual(normalized['media_type'], 'photo')
-        self.assertEqual(normalized['filename'], 'photos/sunset_safe.png')
+        self.assertEqual(normalized['filename'], 'sunset_safe.png')
+        self.assertEqual(normalized['storage_path'], 'photos/sunset_safe.png')
         self.assertEqual(normalized['size_bytes'], 10240)
         self.assertEqual(normalized['file_size'], 10240)
         self.assertEqual(
-            normalized['qr_filename'], 'qr-codes/qr_test_classic.png'
+            normalized['qr_filename'], 'qr_test_classic.png'
+        )
+        self.assertEqual(
+            normalized['qr_code_path'], 'qr-codes/qr_test_classic.png'
         )
 
     def test_storage_upload_and_signed_url(self):

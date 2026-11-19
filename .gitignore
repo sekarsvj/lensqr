@@ -14,6 +14,12 @@ __pycache__/
 
 # Backups
 backup_v1/
+.venv_broken/
+
+# Executables & Tunnels
+*.exe
+cloudflared
+cloudflared.exe
 
 # Test sandboxes
 test_*_sandbox/
@@ -23,5 +29,9 @@ uploads/photos/*
 !uploads/photos/.gitkeep
 uploads/videos/*
 !uploads/videos/.gitkeep
+uploads/documents/*
+!uploads/documents/.gitkeep
 qr_codes/*
 !qr_codes/.gitkeep
+.vercel/
+.vercel

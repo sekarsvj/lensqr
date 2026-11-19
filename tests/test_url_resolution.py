@@ -151,6 +151,71 @@ class TestUrlResolutionAndQrAccessibility(unittest.TestCase):
             if old_render is not None:
                 os.environ['RENDER_EXTERNAL_URL'] = old_render
 
+    def test_cloudflare_tunnel_url_resolution(self):
+        """
+        Verify that Cloudflare Tunnel trycloudflare.com HTTPS URLs are strictly
+        encoded into QR codes and viewer links.
+        """
+        tunnel_url = "https://angle-beast-bottles-infectious.trycloudflare.com"
+        old_pub = os.environ.get('PUBLIC_URL')
+        try:
+            os.environ['PUBLIC_URL'] = tunnel_url
+            test_app = create_app({
+                'TESTING': True,
+                'PUBLIC_URL': tunnel_url
+            })
+            test_client = test_app.test_client()
+            csrf = self.get_csrf(test_client)
+
+            img = self.create_dummy_image()
+            res = test_client.post('/upload/photo', data={
+                'csrf_token': csrf,
+                'title': 'Cloudflare Tunnel Test Photo',
+                'file': (img, 'tunnel_test.png')
+            }, headers={'X-CSRFToken': csrf}, content_type='multipart/form-data')
+
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertTrue(data['success'])
+            self.assertTrue(data['media_url'].startswith(tunnel_url))
+            self.assertNotIn('localhost', data['media_url'])
+            self.assertNotIn('127.0.0.1', data['media_url'])
+        finally:
+            if old_pub is not None:
+                os.environ['PUBLIC_URL'] = old_pub
+            elif 'PUBLIC_URL' in os.environ:
+                del os.environ['PUBLIC_URL']
+
+    def test_proxy_fix_cloudflare_forwarded_headers(self):
+        """
+        Verify that Werkzeug ProxyFix correctly interprets Cloudflare Tunnel
+        forwarded headers (X-Forwarded-Proto, X-Forwarded-Host).
+        """
+        old_pub = os.environ.get('PUBLIC_URL')
+        try:
+            if 'PUBLIC_URL' in os.environ:
+                del os.environ['PUBLIC_URL']
+
+            test_app = create_app({'TESTING': True, 'PUBLIC_URL': ''})
+            test_client = test_app.test_client()
+
+            cf_host = 'my-custom-tunnel.trycloudflare.com'
+            res = test_client.get('/', headers={
+                'X-Forwarded-Proto': 'https',
+                'X-Forwarded-Host': cf_host
+            })
+            self.assertEqual(res.status_code, 200)
+            # The context processor injects public_url which should match the forwarded HTTPS host
+            with test_client.application.test_request_context('/', headers={
+                'X-Forwarded-Proto': 'https',
+                'X-Forwarded-Host': cf_host
+            }):
+                resolved = resolve_public_base_url()
+                self.assertNotIn('localhost', resolved)
+        finally:
+            if old_pub is not None:
+                os.environ['PUBLIC_URL'] = old_pub
+
     def test_batch_qr_regeneration_preserves_ids_and_files(self):
         """
         Verify regenerate_all_qr_codes updates all existing QR codes to the

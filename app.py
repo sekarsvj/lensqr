@@ -6,6 +6,7 @@ from flask import (
     url_for, send_from_directory, abort, session, redirect
 )
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
 from database.database import initialize_storage, get_media, format_file_size
@@ -25,6 +26,16 @@ def create_app(test_config=None):
     if test_config:
         app.config.update(test_config)
 
+    # Support reverse proxy & Cloudflare Tunnel headers (X-Forwarded-Proto, X-Forwarded-Host)
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=1,
+        x_proto=1,
+        x_host=1,
+        x_port=1,
+        x_prefix=1
+    )
+
     # Cookie security settings
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -39,11 +50,15 @@ def create_app(test_config=None):
         upload_videos = app.config.get(
             'UPLOAD_FOLDER_VIDEOS',
             Config.UPLOAD_FOLDER_VIDEOS)
+        upload_docs = app.config.get(
+            'UPLOAD_FOLDER_DOCUMENTS',
+            Config.UPLOAD_FOLDER_DOCUMENTS)
         qr_folder = app.config.get('QR_FOLDER', Config.QR_FOLDER)
         data_dir = app.config.get('DATA_DIR', Config.DATA_DIR)
 
         os.makedirs(upload_photos, exist_ok=True)
         os.makedirs(upload_videos, exist_ok=True)
+        os.makedirs(upload_docs, exist_ok=True)
         os.makedirs(qr_folder, exist_ok=True)
         os.makedirs(data_dir, exist_ok=True)
 
@@ -61,12 +76,21 @@ def create_app(test_config=None):
     def get_public_base_url():
         """
         Determine base public URL for encoded QR targets.
-        Resolves via resolve_public_base_url to avoid loopback localhost issues.
+        Strictly prioritizes PUBLIC_URL and public tunnel domains,
+        avoiding loopback localhost so external scanners can access media.
         """
-        from config import resolve_public_base_url
-        configured = app.config.get('PUBLIC_URL')
-        if configured:
-            return configured.rstrip('/')
+        from config import resolve_public_base_url, is_loopback
+        
+        # Check explicit PUBLIC_URL environment variable first
+        env_pub = os.environ.get('PUBLIC_URL', '').strip().rstrip('/')
+        if env_pub and not is_loopback(env_pub):
+            return env_pub
+
+        # Check app config
+        configured = (app.config.get('PUBLIC_URL') or '').strip().rstrip('/')
+        if configured and not is_loopback(configured):
+            return configured
+
         return resolve_public_base_url(request)
 
     @app.before_request
@@ -248,6 +272,54 @@ def create_app(test_config=None):
             return jsonify(
                 {'success': False, 'error': f'Upload failed: {str(e)}'}), 500
 
+    @app.route('/upload/document', methods=['POST'])
+    def upload_document():
+        """Upload one document (PDF, Word, Excel, PowerPoint, Text, etc.) and generate QR code."""
+        try:
+            file_storage = request.files.get('file')
+            if not file_storage or not file_storage.filename:
+                return jsonify({
+                    'success': False,
+                    'error': 'Please select a document file to upload.'
+                }), 400
+
+            title = request.form.get('title', '')
+            description = request.form.get('description', '')
+            qr_style = request.form.get('qr_style', 'classic')
+
+            record = create_media(
+                file_storage=file_storage,
+                media_type='document',
+                title=title,
+                description=description,
+                qr_style=qr_style,
+                public_base_url=get_public_base_url()
+            )
+
+            # Store creator token in session
+            tokens = session.get('creator_tokens', [])
+            tokens.append(record['creator_token'])
+            session['creator_tokens'] = tokens
+            session.modified = True
+
+            base_url = get_public_base_url()
+            return jsonify({
+                'success': True,
+                'media_id': record['id'],
+                'creator_token': record['creator_token'],
+                'title': record['title'],
+                'media_type': 'document',
+                'media_url': f"{base_url}/m/{record['id']}",
+                'qr_url': url_for(
+                    'serve_qr_image', filename=record['qr_filename']),
+                'result_url': url_for('qr_result', media_id=record['id'])
+            })
+        except ValueError as ve:
+            return jsonify({'success': False, 'error': str(ve)}), 400
+        except Exception as e:
+            return jsonify(
+                {'success': False, 'error': f'Upload failed: {str(e)}'}), 500
+
     @app.route('/result/<media_id>')
     def qr_result(media_id):
         """
@@ -325,14 +397,15 @@ def create_app(test_config=None):
                 return redirect(signed_url, code=307)
 
         safe_filename = os.path.basename(record['filename'])
-        is_photo = (
-            record.get('type') == 'photo' or
-            record.get('media_type') == 'photo'
-        )
-        if is_photo:
+        media_type = record.get('type') or record.get('media_type') or 'photo'
+        if media_type == 'photo':
             folder = app.config.get(
                 'UPLOAD_FOLDER_PHOTOS',
                 Config.UPLOAD_FOLDER_PHOTOS)
+        elif media_type == 'document':
+            folder = app.config.get(
+                'UPLOAD_FOLDER_DOCUMENTS',
+                Config.UPLOAD_FOLDER_DOCUMENTS)
         else:
             folder = app.config.get(
                 'UPLOAD_FOLDER_VIDEOS',
@@ -477,14 +550,31 @@ def create_app(test_config=None):
 app = create_app()
 
 if __name__ == '__main__':
-    from config import get_lan_ip, resolve_public_base_url
+    from config import get_lan_ip, resolve_public_base_url, is_loopback
+    
+    # Run on 0.0.0.0:5000 so external proxies and LAN devices can connect
+    host = os.environ.get('HOST', '0.0.0.0')
     port = int(os.environ.get('PORT', 5000))
+    
+    # Never expose Flask debug mode publicly unless FLASK_DEBUG is explicitly enabled
+    debug = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 't')
+    
     lan_ip = get_lan_ip()
     target_pub = resolve_public_base_url()
+    
     print("=" * 65)
     print("  LensQR Photo & Video QR Generator")
+    print(f"  * Host Binding:       {host}:{port}")
     print(f"  * Local PC Access:    http://127.0.0.1:{port}")
     print(f"  * Mobile/LAN Access:  http://{lan_ip}:{port}")
+    print(f"  * Public Base URL:    {target_pub}")
     print(f"  * QR Codes Will Use:  {target_pub}")
+    print(f"  * Debug Mode:         {debug} (Interactive debugger off)")
     print("=" * 65)
-    app.run(host='0.0.0.0', port=port, debug=True)
+    if is_loopback(target_pub) or target_pub.startswith(f"http://{lan_ip}"):
+        print("  NOTICE: To allow people from other locations (e.g. Punjab) to")
+        print("          scan QR codes, run with Cloudflare Tunnel:")
+        print("          Run: python run_with_tunnel.py")
+        print("=" * 65)
+    
+    app.run(host=host, port=port, debug=debug)

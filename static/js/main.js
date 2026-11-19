@@ -6,6 +6,7 @@
 // Global State
 let selectedPhotoFile = null;
 let selectedVideoFile = null;
+let selectedDocumentFile = null;
 let pendingDeleteMediaId = null;
 let pendingDeleteToken = null;
 
@@ -100,36 +101,51 @@ function updateNavBadge() {
     }
 }
 
-// Mode Switcher (Photo vs Video)
+// Mode Switcher (Photo vs Video vs Document)
 function initModeSwitcher() {
     const tabPhoto = document.getElementById('tabPhoto');
     const tabVideo = document.getElementById('tabVideo');
+    const tabDocument = document.getElementById('tabDocument');
     const panelPhoto = document.getElementById('panelPhoto');
     const panelVideo = document.getElementById('panelVideo');
+    const panelDocument = document.getElementById('panelDocument');
 
     if (!tabPhoto || !tabVideo) return;
 
     function switchMode(mode) {
+        tabPhoto.classList.remove('active');
+        tabVideo.classList.remove('active');
+        if (tabDocument) tabDocument.classList.remove('active');
+
+        panelPhoto.style.display = 'none';
+        panelVideo.style.display = 'none';
+        if (panelDocument) panelDocument.style.display = 'none';
+
         if (mode === 'photo') {
             tabPhoto.classList.add('active');
-            tabVideo.classList.remove('active');
             panelPhoto.style.display = 'block';
-            panelVideo.style.display = 'none';
             window.location.hash = 'photo-section';
-        } else {
+        } else if (mode === 'video') {
             tabVideo.classList.add('active');
-            tabPhoto.classList.remove('active');
             panelVideo.style.display = 'block';
-            panelPhoto.style.display = 'none';
             window.location.hash = 'video-section';
+        } else if (mode === 'document' && panelDocument) {
+            tabDocument.classList.add('active');
+            panelDocument.style.display = 'block';
+            window.location.hash = 'document-section';
         }
     }
 
     tabPhoto.addEventListener('click', () => switchMode('photo'));
     tabVideo.addEventListener('click', () => switchMode('video'));
+    if (tabDocument) {
+        tabDocument.addEventListener('click', () => switchMode('document'));
+    }
 
     if (window.location.hash === '#video-section') {
         switchMode('video');
+    } else if (window.location.hash === '#document-section') {
+        switchMode('document');
     }
 }
 
@@ -714,11 +730,232 @@ function openDeleteModal(mediaId, title, token) {
     };
 }
 
+// Document Upload Management (PDF, Word, Excel, PPT, Text, etc.)
+function initDocumentUpload() {
+    const dropzone = document.getElementById('documentDropzone');
+    const fileInput = document.getElementById('documentFileInput');
+    const browseBtn = document.getElementById('documentBrowseBtn');
+    const previewCard = document.getElementById('documentPreviewCard');
+    const fileNameEl = document.getElementById('documentFileName');
+    const fileSizeEl = document.getElementById('documentFileSize');
+    const extBadgeEl = document.getElementById('documentExtBadge');
+    const iconWrapper = document.getElementById('docTypeIconWrapper');
+    const removeBtn = document.getElementById('removeDocumentBtn');
+    const submitBtn = document.getElementById('submitDocumentBtn');
+    const form = document.getElementById('documentUploadForm');
+    const progressWrap = document.getElementById('documentProgressWrap');
+    const progressBar = document.getElementById('documentProgressBar');
+    const progressStatus = document.getElementById('documentProgressStatus');
+    const progressPercent = document.getElementById('documentProgressPercent');
+    const stylePicker = document.getElementById('documentStylePicker');
+    const styleInput = document.getElementById('documentQrStyle');
+
+    if (!form || !fileInput) return;
+
+    // Document Color Theme Picker
+    if (stylePicker && styleInput) {
+        stylePicker.addEventListener('click', (e) => {
+            const pill = e.target.closest('.style-pill');
+            if (!pill) return;
+            stylePicker.querySelectorAll('.style-pill').forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            styleInput.value = pill.getAttribute('data-style');
+        });
+    }
+
+    if (browseBtn) {
+        browseBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.click();
+        });
+    }
+
+    if (dropzone) {
+        dropzone.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                fileInput.click();
+            }
+        });
+
+        ['dragenter', 'dragover'].forEach(evt => {
+            dropzone.addEventListener(evt, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('drag-active');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(evt => {
+            dropzone.addEventListener(evt, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('drag-active');
+            });
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                handleDocumentSelection(files[0]);
+            }
+        });
+    }
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files && fileInput.files.length > 0) {
+            handleDocumentSelection(fileInput.files[0]);
+        }
+    });
+
+    function getDocIconSvg(ext) {
+        if (ext === 'pdf') {
+            return `<svg viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="13" y2="17"></line></svg>`;
+        } else if (['doc', 'docx'].includes(ext)) {
+            return `<svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>`;
+        } else if (['xls', 'xlsx', 'csv'].includes(ext)) {
+            return `<svg viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><rect x="8" y="12" width="8" height="6"></rect></svg>`;
+        } else if (['ppt', 'pptx'].includes(ext)) {
+            return `<svg viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><circle cx="12" cy="14" r="3"></circle></svg>`;
+        } else if (['zip', 'tar', 'gz', '7z', 'rar'].includes(ext)) {
+            return `<svg viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2" width="36" height="36"><path d="M21 8v13H3V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>`;
+        }
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line></svg>`;
+    }
+
+    function handleDocumentSelection(file) {
+        if (!file) return;
+
+        const ext = file.name.split('.').pop().toLowerCase();
+        const maxLimitBytes = 50 * 1024 * 1024; // 50MB
+
+        if (file.size > maxLimitBytes) {
+            showToast('Document file exceeds the 50MB size limit.', 'error');
+            return;
+        }
+
+        selectedDocumentFile = file;
+        fileNameEl.textContent = file.name;
+        fileSizeEl.textContent = formatBytes(file.size);
+        extBadgeEl.textContent = ext.toUpperCase();
+        if (iconWrapper) {
+            iconWrapper.innerHTML = getDocIconSvg(ext);
+        }
+
+        dropzone.style.display = 'none';
+        previewCard.style.display = 'block';
+        submitBtn.disabled = false;
+
+        const titleInput = document.getElementById('documentTitle');
+        if (titleInput && !titleInput.value.trim()) {
+            titleInput.value = file.name.replace(/\.[^/.]+$/, "");
+        }
+    }
+
+    if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+            selectedDocumentFile = null;
+            fileInput.value = '';
+            previewCard.style.display = 'none';
+            dropzone.style.display = 'block';
+            submitBtn.disabled = true;
+        });
+    }
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!selectedDocumentFile) {
+            showToast('Please select a document file first.', 'error');
+            return;
+        }
+
+        const formData = new FormData(form);
+        formData.set('file', selectedDocumentFile);
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<div class="spinner-sm"></div><span>Uploading Document...</span>`;
+        if (progressWrap) progressWrap.style.display = 'block';
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', form.action, true);
+        xhr.setRequestHeader('X-CSRFToken', getCsrfToken());
+
+        xhr.upload.onprogress = (evt) => {
+            if (evt.lengthComputable) {
+                const percent = Math.round((evt.loaded / evt.total) * 100);
+                if (progressBar) progressBar.style.width = percent + '%';
+                if (progressPercent) progressPercent.textContent = percent + '%';
+                if (progressStatus) {
+                    progressStatus.textContent = percent < 100
+                        ? `Uploading document (${formatBytes(evt.loaded)} / ${formatBytes(evt.total)})...`
+                        : 'Generating QR code & syncing storage...';
+                }
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        saveMediaToLocalStorage({
+                            mediaId: data.media_id,
+                            title: data.title,
+                            mediaType: 'document',
+                            mediaUrl: data.media_url,
+                            qrUrl: data.qr_url,
+                            resultUrl: data.result_url,
+                            creatorToken: data.creator_token,
+                            createdAt: new Date().toISOString()
+                        });
+                        showToast('Document QR Code generated successfully!', 'success');
+                        window.location.href = data.result_url;
+                    } else {
+                        showToast(data.error || 'Upload failed.', 'error');
+                        resetSubmit();
+                    }
+                } catch (err) {
+                    showToast('Failed to parse server response.', 'error');
+                    resetSubmit();
+                }
+            } else {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    showToast(data.error || `Upload failed with status ${xhr.status}`, 'error');
+                } catch {
+                    showToast(`Server returned status ${xhr.status}`, 'error');
+                }
+                resetSubmit();
+            }
+        };
+
+        xhr.onerror = () => {
+            showToast('Network error during upload.', 'error');
+            resetSubmit();
+        };
+
+        function resetSubmit() {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="20" height="20">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                <span>Generate Document QR Code</span>
+            `;
+            if (progressWrap) progressWrap.style.display = 'none';
+        }
+
+        xhr.send(formData);
+    });
+}
+
 // Global DOM Ready Initialization
 document.addEventListener('DOMContentLoaded', () => {
     updateNavBadge();
     initModeSwitcher();
     initPhotoUpload();
     initVideoUpload();
+    initDocumentUpload();
     initResultPage();
 });

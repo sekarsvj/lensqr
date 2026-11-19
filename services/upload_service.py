@@ -35,6 +35,8 @@ def is_allowed_file(filename, media_type):
         return ext in Config.ALLOWED_PHOTO_EXTENSIONS
     elif media_type == 'video':
         return ext in Config.ALLOWED_VIDEO_EXTENSIONS
+    elif media_type == 'document':
+        return ext in Config.ALLOWED_DOCUMENT_EXTENSIONS
     return False
 
 
@@ -50,6 +52,10 @@ def validate_magic_bytes(file_stream, ext):
     if len(header) < 4:
         return False, "Uploaded file is empty or corrupted."
 
+    # Prevent executable file uploads under any circumstances
+    if header.startswith(b'MZ') or header.startswith(b'\x7FELF'):
+        return False, "Executable binaries are not permitted."
+
     if ext in ['jpg', 'jpeg']:
         if not header.startswith(b'\xFF\xD8\xFF'):
             return False, "Invalid JPEG file signature."
@@ -64,8 +70,6 @@ def validate_magic_bytes(file_stream, ext):
         if not header.startswith(b'\x1A\x45\xDF\xA3'):
             return False, "Invalid WebM video file signature."
     elif ext in ['mp4', 'mov']:
-        # MP4/MOV container typically has 'ftyp', 'moov', 'mdat', 'wide', or
-        # 'free' at offset 4..8
         if len(header) >= 8:
             box_type = header[4:8]
             valid_boxes = [
@@ -75,6 +79,15 @@ def validate_magic_bytes(file_stream, ext):
                 return False, "Invalid MP4/MOV video file container."
         else:
             return False, "Invalid video container header structure."
+    elif ext == 'pdf':
+        if not header.startswith(b'%PDF-'):
+            return False, "Invalid PDF file signature."
+    elif ext in ['docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'zip']:
+        if not header.startswith(b'PK\x03\x04') and not header.startswith(b'PK\x05\x06'):
+            return False, f"Invalid Office/Zip archive signature for .{ext}."
+    elif ext in ['doc', 'xls', 'ppt']:
+        if not header.startswith(b'\xD0\xCF\x11\xE0'):
+            return False, f"Invalid legacy Office document signature for .{ext}."
 
     return True, None
 
@@ -110,10 +123,12 @@ def save_uploaded_file(file_storage, media_type):
 
     ext = get_file_extension(raw_filename)
     if not ext or not is_allowed_file(raw_filename, media_type):
-        allowed = (
-            Config.ALLOWED_PHOTO_EXTENSIONS if media_type == 'photo'
-            else Config.ALLOWED_VIDEO_EXTENSIONS
-        )
+        if media_type == 'photo':
+            allowed = Config.ALLOWED_PHOTO_EXTENSIONS
+        elif media_type == 'video':
+            allowed = Config.ALLOWED_VIDEO_EXTENSIONS
+        else:
+            allowed = Config.ALLOWED_DOCUMENT_EXTENSIONS
         raise ValueError(
             f"File format '.{ext}' is not supported for {media_type} QR. "
             f"Permitted formats: {', '.join(sorted(allowed))}"
@@ -128,14 +143,16 @@ def save_uploaded_file(file_storage, media_type):
         raise ValueError("Uploaded file is completely empty.")
 
     # Check max file size
-    max_limit = (
-        Config.MAX_PHOTO_SIZE if media_type == 'photo'
-        else Config.MAX_VIDEO_SIZE
-    )
-    max_mb = (
-        Config.MAX_PHOTO_MB if media_type == 'photo'
-        else Config.MAX_VIDEO_MB
-    )
+    if media_type == 'photo':
+        max_limit = Config.MAX_PHOTO_SIZE
+        max_mb = Config.MAX_PHOTO_MB
+    elif media_type == 'video':
+        max_limit = Config.MAX_VIDEO_SIZE
+        max_mb = Config.MAX_VIDEO_MB
+    else:
+        max_limit = Config.MAX_DOCUMENT_SIZE
+        max_mb = Config.MAX_DOCUMENT_MB
+
     if file_size > max_limit:
         raise ValueError(
             f"File exceeds the maximum permitted size of {max_mb} MB.")
@@ -153,13 +170,17 @@ def save_uploaded_file(file_storage, media_type):
 
     # Generate cryptographically secure random server filename
     safe_filename = f"{uuid.uuid4().hex}.{ext}"
-    subfolder = 'photos' if media_type == 'photo' else 'videos'
-    storage_path = f"{subfolder}/{safe_filename}"
+    if media_type == 'photo':
+        subfolder = 'photos'
+        target_dir = Config.UPLOAD_FOLDER_PHOTOS
+    elif media_type == 'video':
+        subfolder = 'videos'
+        target_dir = Config.UPLOAD_FOLDER_VIDEOS
+    else:
+        subfolder = 'documents'
+        target_dir = Config.UPLOAD_FOLDER_DOCUMENTS
 
-    target_dir = (
-        Config.UPLOAD_FOLDER_PHOTOS if media_type == 'photo'
-        else Config.UPLOAD_FOLDER_VIDEOS
-    )
+    storage_path = f"{subfolder}/{safe_filename}"
     os.makedirs(target_dir, exist_ok=True)
 
     dest_path = os.path.join(target_dir, safe_filename)
@@ -180,6 +201,34 @@ def save_uploaded_file(file_storage, media_type):
             mime_type = 'video/quicktime'
         elif ext == 'webm':
             mime_type = 'video/webm'
+        elif ext == 'pdf':
+            mime_type = 'application/pdf'
+        elif ext == 'doc':
+            mime_type = 'application/msword'
+        elif ext == 'docx':
+            mime_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        elif ext == 'xls':
+            mime_type = 'application/vnd.ms-excel'
+        elif ext == 'xlsx':
+            mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        elif ext == 'ppt':
+            mime_type = 'application/vnd.ms-powerpoint'
+        elif ext == 'pptx':
+            mime_type = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        elif ext == 'txt':
+            mime_type = 'text/plain'
+        elif ext == 'rtf':
+            mime_type = 'application/rtf'
+        elif ext in ['csv', 'tsv']:
+            mime_type = 'text/csv'
+        elif ext == 'zip':
+            mime_type = 'application/zip'
+        elif ext == 'json':
+            mime_type = 'application/json'
+        elif ext == 'xml':
+            mime_type = 'application/xml'
+        else:
+            mime_type = 'application/octet-stream'
 
     # Sync to Supabase Storage if configured
     try:
@@ -206,10 +255,16 @@ def delete_uploaded_file(filename, media_type, storage_path=None):
         return
 
     # Delete from local filesystem
-    folder = (
-        Config.UPLOAD_FOLDER_PHOTOS if media_type == 'photo'
-        else Config.UPLOAD_FOLDER_VIDEOS
-    )
+    if media_type == 'photo':
+        folder = Config.UPLOAD_FOLDER_PHOTOS
+        subfolder = 'photos'
+    elif media_type == 'video':
+        folder = Config.UPLOAD_FOLDER_VIDEOS
+        subfolder = 'videos'
+    else:
+        folder = Config.UPLOAD_FOLDER_DOCUMENTS
+        subfolder = 'documents'
+
     safe_name = os.path.basename(filename)
     path = os.path.join(folder, safe_name)
     if os.path.isfile(path):
@@ -221,7 +276,6 @@ def delete_uploaded_file(filename, media_type, storage_path=None):
     # Delete from Supabase Storage
     try:
         from services.storage_service import delete_from_storage
-        subfolder = 'photos' if media_type == 'photo' else 'videos'
         target_path = storage_path or f"{subfolder}/{safe_name}"
         delete_from_storage(target_path)
     except Exception as e:

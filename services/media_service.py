@@ -42,8 +42,8 @@ def create_media(
     generate a high-resolution QR code, and persist metadata
     to Supabase PostgreSQL (with local JSON sync).
     """
-    if media_type not in ['photo', 'video']:
-        raise ValueError("Invalid media type. Must be 'photo' or 'video'.")
+    if media_type not in ['photo', 'video', 'document']:
+        raise ValueError("Invalid media type. Must be 'photo', 'video', or 'document'.")
 
     # Validate and save binary file (local + Supabase Storage)
     file_info = save_uploaded_file(file_storage, media_type)
@@ -59,7 +59,12 @@ def create_media(
     qr_filename = generate_qr_code(target_url, media_id, style=qr_style)
     qr_storage_path = f"qr-codes/{qr_filename}"
 
-    default_title = 'Photo' if media_type == 'photo' else 'Video'
+    if media_type == 'photo':
+        default_title = 'Photo'
+    elif media_type == 'video':
+        default_title = 'Video'
+    else:
+        default_title = file_info.get('original_name', 'Document')
     media_title = title.strip() if title else default_title
 
     # Construct unified metadata record
@@ -209,7 +214,13 @@ def get_signed_media_url(
 
     storage_path = record.get('storage_path')
     if not storage_path:
-        subfolder = 'photos' if record.get('type') == 'photo' else 'videos'
+        mtype = record.get('type') or record.get('media_type') or 'photo'
+        if mtype == 'photo':
+            subfolder = 'photos'
+        elif mtype == 'video':
+            subfolder = 'videos'
+        else:
+            subfolder = 'documents'
         storage_path = f"{subfolder}/{record.get('filename')}"
 
     return generate_signed_url(storage_path, expires_in=expires_in)
@@ -224,7 +235,12 @@ def format_media_dict(
 
     media_id = record['id']
     media_type = record.get('type') or record.get('media_type') or 'photo'
-    default_title = 'Photo' if media_type == 'photo' else 'Video'
+    if media_type == 'photo':
+        default_title = 'Photo'
+    elif media_type == 'video':
+        default_title = 'Video'
+    else:
+        default_title = record.get('original_name') or 'Document'
     size_val = record.get('size_bytes') or record.get('file_size') or 0
 
     return {

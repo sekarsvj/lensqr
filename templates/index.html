@@ -10,10 +10,10 @@
             <span>Dedicated Media QR Generator</span>
         </div>
         <h1 class="hero-title">
-            Transform Photos & Videos into <span class="gradient-text">Scan-Ready QR Codes</span>
+            Transform Photos, Videos & Documents into <span class="gradient-text">Scan-Ready QR Codes</span>
         </h1>
         <p class="hero-subtitle">
-            Create high-resolution QR codes linking directly to unlisted, mobile-optimized photo viewers or native HTML5 video players. Instant camera scanning with zero app installations.
+            Create high-resolution QR codes linking directly to unlisted, mobile-optimized photo viewers, native HTML5 video players, or instant document previews (PDF, Word, Excel & more). Instant camera scanning with zero app installations.
         </p>
 
         <!-- Mode Selector Switcher -->
@@ -32,6 +32,16 @@
                     <rect x="1" y="5" width="15" height="14" rx="2"></rect>
                 </svg>
                 <span>Video to QR</span>
+            </button>
+            <button type="button" class="mode-tab" data-mode="document" id="tabDocument">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                <span>Document to QR</span>
             </button>
         </div>
     </div>
@@ -246,6 +256,120 @@
                             <rect x="1" y="5" width="15" height="14" rx="2"></rect>
                         </svg>
                         <span>Generate Video QR Code</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- DOCUMENT UPLOAD PANEL -->
+        <div class="mode-panel" id="panelDocument" style="display: none;">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">Upload Document & Generate QR</h2>
+                    <p class="panel-subtitle">Upload any document (PDF, Word, Excel, PowerPoint, Text, Zip) to create an instant scan-to-view QR code.</p>
+                </div>
+                <div class="format-chips">
+                    <span class="chip">PDF</span>
+                    <span class="chip">DOCX / DOC</span>
+                    <span class="chip">XLSX / XLS</span>
+                    <span class="chip">PPTX / PPT</span>
+                    <span class="chip">TXT / CSV</span>
+                    <span class="chip">ZIP</span>
+                    <span class="chip chip-limit">Max {{ config.MAX_DOCUMENT_MB }}MB</span>
+                </div>
+            </div>
+
+            <form id="documentUploadForm" class="upload-form" action="{{ url_for('upload_document') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                
+                <!-- Dropzone for Document -->
+                <div class="dropzone" id="documentDropzone">
+                    <input type="file" id="documentFileInput" name="file" class="file-input-hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.csv,.tsv,.odt,.ods,.odp,.zip,.tar,.gz,.7z,.rar,.json,.xml,.md">
+                    <div class="dropzone-content">
+                        <div class="dropzone-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                        </div>
+                        <h3 class="dropzone-title">Drag & drop your document here</h3>
+                        <p class="dropzone-hint">or <button type="button" class="btn-text" id="documentBrowseBtn">browse from device</button></p>
+                        <p class="dropzone-subhint">Supports PDF, Word, Excel, PowerPoint, Text, Zip & more up to {{ config.MAX_DOCUMENT_MB }}MB</p>
+                    </div>
+                </div>
+
+                <!-- Document Preview Card -->
+                <div class="document-preview-card" id="documentPreviewCard" style="display: none;">
+                    <div class="document-preview-info-box">
+                        <div class="doc-type-icon-wrapper" id="docTypeIconWrapper">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="36" height="36">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                        </div>
+                        <div class="doc-meta-info">
+                            <span class="preview-file-name" id="documentFileName">document.pdf</span>
+                            <span class="preview-file-size" id="documentFileSize">0 MB</span>
+                            <span class="doc-badge-chip" id="documentExtBadge">PDF</span>
+                        </div>
+                        <button type="button" class="btn-icon btn-remove-file" id="removeDocumentBtn" title="Remove file">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Document Metadata Fields -->
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="documentTitle" class="form-label">Document Title <span class="optional">(Optional)</span></label>
+                        <input type="text" id="documentTitle" name="title" class="form-input form-control" placeholder="e.g. Project Proposal, Annual Report 2026, Menu" maxlength="100">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="documentDescription" class="form-label">Note / Description <span class="optional">(Optional)</span></label>
+                        <textarea id="documentDescription" name="description" class="form-textarea form-control" placeholder="Add an optional message or summary for scanners..." rows="2" maxlength="300"></textarea>
+                    </div>
+                </div>
+
+                <!-- QR Style Palette Picker for Document -->
+                <div class="form-group">
+                    <label class="form-label">QR Code Color Palette</label>
+                    <div class="style-picker" id="documentStylePicker">
+                        {% for key, val in qr_styles.items() %}
+                        <button type="button" class="style-pill {% if key == 'classic' %}active{% endif %}" data-style="{{ key }}">
+                            <span class="pill-dot" style="background-color: {{ val.fill_color }};"></span>
+                            <span class="pill-label">{{ val.name }}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" name="qr_style" id="documentQrStyle" value="classic">
+                </div>
+
+                <!-- Progress Bar Container -->
+                <div class="upload-progress-wrap" id="documentProgressWrap" style="display: none;">
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="documentProgressBar"></div>
+                    </div>
+                    <div class="progress-meta">
+                        <span id="documentProgressStatus">Uploading document...</span>
+                        <span id="documentProgressPercent">0%</span>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="form-submit">
+                    <button type="submit" class="btn btn-primary btn-lg" id="submitDocumentBtn" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="20" height="20">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                        <span>Generate Document QR Code</span>
                     </button>
                 </div>
             </form>

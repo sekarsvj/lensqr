@@ -10,12 +10,21 @@
         <div class="viewer-header">
             <div class="viewer-header-left">
                 <div class="viewer-type-pill">
-                    {% if media.type == 'photo' %}
+                    {% if media.type == 'photo' or media.media_type == 'photo' %}
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                     <span>Photograph</span>
-                    {% else %}
+                    {% elif media.type == 'video' or media.media_type == 'video' %}
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
                     <span>Video</span>
+                    {% else %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span>Document</span>
                     {% endif %}
                 </div>
                 <h1 class="viewer-title">{{ media.title or media.original_name }}</h1>
@@ -66,7 +75,7 @@
         </div>
 
         <!-- VIDEO VIEWER CONTENT -->
-        {% else %}
+        {% elif media.type == 'video' or media.media_type == 'video' %}
         <div class="video-viewer-wrapper">
             <div class="video-frame-container">
                 <video id="mainVideoPlayer" class="main-video-player" controls preload="metadata" playsinline>
@@ -85,6 +94,57 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                         <span>Download Video</span>
                     </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- DOCUMENT VIEWER CONTENT (PDF, Word, Excel, PowerPoint, Text, Zip) -->
+        {% else %}
+        <div class="document-viewer-card">
+            {% set fname = (media.original_name or '')|lower %}
+            {% set is_pdf = fname.endswith('.pdf') or (media.mime_type == 'application/pdf') %}
+
+            <!-- Embedded PDF Previewer -->
+            {% if is_pdf %}
+            <div class="pdf-frame-wrapper">
+                <iframe src="{{ media_file_url or url_for('serve_media_file', media_id=media.id) }}" class="pdf-viewer-iframe" title="PDF Document Viewer">
+                    <p>Your browser does not support inline PDF viewing. <a href="{{ media_file_url or url_for('serve_media_file', media_id=media.id) }}">Download the PDF</a> instead.</p>
+                </iframe>
+            </div>
+            {% endif %}
+
+            <!-- Document Details & Download Bar -->
+            <div class="document-details-bar">
+                <div class="doc-icon-badge">
+                    {% if fname.endswith('.pdf') %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="13" y2="17"></line></svg>
+                    {% elif fname.endswith('.doc') or fname.endswith('.docx') %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    {% elif fname.endswith('.xls') or fname.endswith('.xlsx') or fname.endswith('.csv') %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><rect x="8" y="12" width="8" height="6"></rect></svg>
+                    {% elif fname.endswith('.ppt') or fname.endswith('.pptx') %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><circle cx="12" cy="14" r="3"></circle></svg>
+                    {% elif fname.endswith('.zip') or fname.endswith('.tar') or fname.endswith('.gz') or fname.endswith('.7z') or fname.endswith('.rar') %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2" width="36" height="36"><path d="M21 8v13H3V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>
+                    {% else %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" width="36" height="36"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line></svg>
+                    {% endif %}
+                </div>
+                <div class="doc-info-text">
+                    <span class="document-detail-name">{{ media.original_name }}</span>
+                    <span class="document-detail-meta">Format: {{ media.mime_type or 'Document' }} &bull; {{ formatted_size }}</span>
+                </div>
+                <div class="doc-actions-right">
+                    <a href="{{ media_file_url or url_for('serve_media_file', media_id=media.id) }}" download="{{ media.original_name }}" class="btn btn-primary btn-md">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        <span>Download Document</span>
+                    </a>
+                    {% if is_pdf %}
+                    <a href="{{ media_file_url or url_for('serve_media_file', media_id=media.id) }}" target="_blank" rel="noopener" class="btn btn-secondary btn-md">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                        <span>Open in New Tab</span>
+                    </a>
+                    {% endif %}
                 </div>
             </div>
         </div>

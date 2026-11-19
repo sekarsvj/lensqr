@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LensQR Presentation - College Project</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #090D16;
+            --bg-card: rgba(17, 24, 39, 0.85);
+            --border-glass: rgba(255, 255, 255, 0.12);
+            --coral-primary: #FF5E62;
+            --coral-secondary: #FF6B6B;
+            --coral-gradient: linear-gradient(135deg, #FF5E62 0%, #FA709A 100%);
+            --blue-accent: #38BDF8;
+            --green-accent: #34D399;
+            --purple-accent: #A78BFA;
+            --text-main: #F8FAFC;
+            --text-sub: #94A3B8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Ambient Glows */
+        .ambient-glow {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(140px);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .glow-1 {
+            width: 600px;
+            height: 400px;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: radial-gradient(circle, rgba(255, 94, 98, 0.15) 0%, transparent 70%);
+        }
+        .glow-2 {
+            width: 500px;
+            height: 500px;
+            bottom: -100px;
+            right: 0;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, transparent 70%);
+        }
+
+        /* Top Presentation Header Bar */
+        .pres-header {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 2.5rem;
+            border-bottom: 1px solid var(--border-glass);
+            background: rgba(9, 13, 22, 0.7);
+            backdrop-filter: blur(12px);
+        }
+
+        .brand-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .brand-logo-box {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: var(--coral-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 800;
+            font-size: 16px;
+        }
+        .brand-title {
+            font-size: 1.1rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+        .brand-tag {
+            font-size: 0.75rem;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-glass);
+            padding: 3px 8px;
+            border-radius: 999px;
+            color: var(--text-sub);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .slide-counter {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 0.95rem;
+            color: var(--coral-secondary);
+            font-weight: 700;
+            background: rgba(255, 94, 98, 0.1);
+            border: 1px solid rgba(255, 94, 98, 0.25);
+            padding: 4px 14px;
+            border-radius: 999px;
+        }
+        .btn-ctrl {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-glass);
+            color: var(--text-main);
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-ctrl:hover {
+            background: rgba(255, 255, 255, 0.16);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Slide Deck Viewport */
+        .deck-container {
+            position: relative;
+            z-index: 5;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem 3rem;
+            overflow: hidden;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            max-width: 1200px;
+            height: calc(100vh - 150px);
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-glass);
+            border-radius: 24px;
+            padding: 2.8rem 3.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            flex-direction: column;
+            justify-content: space-between;
+            animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow-y: auto;
+        }
+
+        .slide.active {
+            display: flex;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(12px) scale(0.99); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* Slide Typography */
+        .slide-tag {
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--coral-secondary);
+            margin-bottom: 0.4rem;
+            display: inline-block;
+        }
+        .slide-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.3rem;
+            font-weight: 700;
+            line-height: 1.2;
+            letter-spacing: -0.03em;
+            margin-bottom: 0.8rem;
+        }
+        .gradient-text {
+            background: var(--coral-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .slide-desc {
+            font-size: 1.05rem;
+            color: var(--text-sub);
+            line-height: 1.6;
+            margin-bottom: 1.8rem;
+            max-width: 950px;
+        }
+
+        /* Grids & Cards inside slides */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.75rem;
+            flex: 1;
+            align-items: stretch;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1.4rem;
+            flex: 1;
+        }
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.2rem;
+            flex: 1;
+        }
+
+        .glass-box {
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid var(--border-glass);
+            border-radius: 18px;
+            padding: 1.6rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .glass-box:hover {
+            border-color: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .box-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: rgba(255, 94, 98, 0.12);
+            color: var(--coral-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 1rem;
+        }
+        .box-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 0.6rem;
+            color: #FFFFFF;
+        }
+        .box-text {
+            font-size: 0.92rem;
+            color: var(--text-sub);
+            line-height: 1.55;
+        }
+
+        /* Bullet List Clean Styling */
+        .feature-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+        }
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            font-size: 0.95rem;
+            color: #E2E8F0;
+            line-height: 1.5;
+        }
+        .feature-bullet {
+            color: var(--coral-secondary);
+            font-weight: 800;
+            font-size: 1.1rem;
+            line-height: 1;
+            margin-top: 2px;
+        }
+
+        /* Team Cards on Title Slide */
+        .team-section {
+            margin-top: 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        .team-card {
+            background: rgba(15, 23, 42, 0.75);
+            border: 1.5px solid var(--border-glass);
+            border-radius: 16px;
+            padding: 1.4rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        .avatar-box {
+            width: 54px;
+            height: 54px;
+            border-radius: 14px;
+            background: var(--coral-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 20px;
+            color: white;
+            flex-shrink: 0;
+        }
+        .team-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+        .team-role {
+            font-size: 0.75rem;
+            color: var(--coral-secondary);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .team-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #FFFFFF;
+        }
+        .team-meta {
+            font-size: 0.85rem;
+            color: var(--text-sub);
+        }
+
+        /* Product Image Showcase */
+        .img-container {
+            width: 100%;
+            height: 100%;
+            min-height: 300px;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--border-glass);
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .img-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Bottom Slide Navigation Bar */
+        .pres-footer {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.9rem 2.5rem;
+            border-top: 1px solid var(--border-glass);
+            background: rgba(9, 13, 22, 0.8);
+            backdrop-filter: blur(12px);
+        }
+        .nav-btns {
+            display: flex;
+            gap: 0.75rem;
+        }
+        .btn-nav {
+            padding: 0.65rem 1.4rem;
+            border-radius: 10px;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 0.9rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-prev {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-main);
+            border: 1px solid var(--border-glass);
+        }
+        .btn-prev:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        .btn-next {
+            background: var(--coral-gradient);
+            color: white;
+            box-shadow: 0 4px 16px rgba(255, 94, 98, 0.35);
+        }
+        .btn-next:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 94, 98, 0.5);
+        }
+
+        /* Print styles */
+        @media print {
+            body { overflow: visible; background: #fff; color: #000; }
+            .pres-header, .pres-footer, .ambient-glow { display: none; }
+            .deck-container { padding: 0; }
+            .slide { display: flex !important; page-break-after: always; height: auto; border: 1px solid #ccc; box-shadow: none; background: #fff; color: #000; margin-bottom: 2rem; }
+            .glass-box { background: #f8fafc; border: 1px solid #ddd; }
+            .team-card { background: #f1f5f9; border: 1px solid #ddd; }
+            .box-title, .team-name, .slide-title { color: #000; }
+            .box-text, .slide-desc, .team-meta { color: #475569; }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+
+    <!-- Top Header -->
+    <header class="pres-header">
+        <div class="brand-badge">
+            <div class="brand-logo-box">L</div>
+            <span class="brand-title">LensQR Presentation</span>
+            <span class="brand-tag">Final Year Project</span>
+        </div>
+        <div class="header-controls">
+            <span class="slide-counter" id="slideIndicator">Slide 1 / 10</span>
+            <button type="button" class="btn-ctrl" onclick="toggleFullscreen()" title="Fullscreen mode (F11)">⛶ Fullscreen</button>
+            <button type="button" class="btn-ctrl" onclick="window.print()" title="Print / Save as PDF">🖨️ Export PDF</button>
+        </div>
+    </header>
+
+    <!-- Main Slide Deck -->
+    <main class="deck-container">
+
+        <!-- SLIDE 1: Title & Team Details -->
+        <section class="slide active" id="slide-1">
+            <div>
+                <span class="slide-tag">Final Year Python / Web Technology Project</span>
+                <h1 class="slide-title">LensQR: <span class="gradient-text">Frictionless Physical-to-Digital</span> Media & Document Distribution Platform</h1>
+                <p class="slide-desc">
+                    An open-access, zero-login system converting Photos, Streaming Videos, and Universal Documents into mobile-optimized QR codes for smart campuses, public healthcare, and paperless governance.
+                </p>
+            </div>
+
+            <div class="team-section">
+                <!-- Team Member 1 (You) -->
+                <div class="team-card">
+                    <div class="avatar-box">1</div>
+                    <div class="team-info">
+                        <span class="team-role">Project Lead / Presenter</span>
+                        <div class="team-name" contenteditable="true" title="Click to edit your name">[Your Full Name]</div>
+                        <div class="team-meta" contenteditable="true" title="Click to edit details">Register No: 2026CS101 • Dept. of Computer Science</div>
+                    </div>
+                </div>
+
+                <!-- Team Member 2 (Teammate) -->
+                <div class="team-card">
+                    <div class="avatar-box">2</div>
+                    <div class="team-info">
+                        <span class="team-role">Co-Developer / Teammate</span>
+                        <div class="team-name" contenteditable="true" title="Click to edit teammate name">[Teammate Full Name]</div>
+                        <div class="team-meta" contenteditable="true" title="Click to edit details">Register No: 2026CS102 • Dept. of Computer Science</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.2rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-glass); padding-top: 0.9rem;">
+                <span style="font-size: 0.85rem; color: var(--text-sub);" contenteditable="true">College / Institution: <strong>[Your College Name Here]</strong></span>
+                <span style="font-size: 0.85rem; color: var(--text-sub);" contenteditable="true">Faculty Supervisor: <strong>[Prof. / Dr. Supervisor Name]</strong></span>
+            </div>
+        </section>
+
+        <!-- SLIDE 2: Introduction & Motivation -->
+        <section class="slide" id="slide-2">
+            <div>
+                <span class="slide-tag">Background & Context</span>
+                <h2 class="slide-title">The Physical-to-Digital Information Gap</h2>
+                <p class="slide-desc">Every day, thousands of public notice boards, medical clinics, and classrooms struggle to deliver rich digital knowledge to citizens through static paper.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="glass-box">
+                    <div class="box-icon">📋</div>
+                    <h3 class="box-title">Static Notice Boards</h3>
+                    <p class="box-text">Paper prints cannot play instructional videos, zoom into complex diagrams, or update dynamically once posted. This leads to information obsolescence and high reprint costs.</p>
+                </div>
+                <div class="glass-box">
+                    <div class="box-icon">🔐</div>
+                    <h3 class="box-title">App & Account Fatigue</h3>
+                    <p class="box-text">Traditional cloud drives (Google Drive, Dropbox) require logins, passwords, permission approvals ("Request Access"), and dedicated apps that discourage spontaneous learning.</p>
+                </div>
+                <div class="glass-box">
+                    <div class="box-icon">🌱</div>
+                    <h3 class="box-title">Environmental Impact</h3>
+                    <p class="box-text">Educational institutions, hospitals, and municipal offices print thousands of single-use sheets weekly, generating unnecessary waste and logistical friction.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 3: Problem Statement -->
+        <section class="slide" id="slide-3">
+            <div>
+                <span class="slide-tag">Problem Definition</span>
+                <h2 class="slide-title">Formal Problem Statement</h2>
+                <p class="slide-desc">Addressing the digital divide and user friction in contemporary digital information exchange.</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="glass-box" style="border-left: 4px solid var(--coral-secondary);">
+                    <h3 class="box-title" style="color: var(--coral-secondary); margin-bottom: 1rem;">Core Problem Formulation</h3>
+                    <p class="box-text" style="font-size: 1.05rem; line-height: 1.7;">
+                        <em>"Existing information distribution mechanisms force citizens either onto wasteful physical paper notices or through closed, high-friction cloud ecosystems demanding user accounts, app downloads, and personal phone number exchanges.
+                        <br><br>
+                        There is an urgent requirement for an open-access, zero-login physical-to-digital gateway enabling any mobile device camera to instantly stream instructional video, zoom into high-res images, and view educational or administrative documents directly in a lightweight browser."</em>
+                    </p>
+                </div>
+
+                <div class="glass-box">
+                    <h3 class="box-title">Identified Key Bottlenecks</h3>
+                    <ul class="feature-list" style="margin-top: 0.5rem;">
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>Access Friction:</strong> "Permission denied" or "Sign in with Google" prompts when scanning public QR codes.</div>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>Format Rigidity:</strong> Traditional QR generators handle only short web links or plain text, not native multi-format media.</div>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>Network Isolation:</strong> Local development servers cannot be accessed by external scanners without specialized edge tunneling.</div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 4: The Proposed Solution -->
+        <section class="slide" id="slide-4">
+            <div>
+                <span class="slide-tag">The Solution</span>
+                <h2 class="slide-title">LensQR: 3-in-1 Universal Media Gateway</h2>
+                <p class="slide-desc">A unified Python web architecture enabling one-click transformation of three media classes into scan-ready QR codes.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="glass-box" style="border-top: 3px solid #38BDF8;">
+                    <div class="box-icon" style="color: #38BDF8; background: rgba(56, 189, 248, 0.15);">🖼️</div>
+                    <h3 class="box-title">1. Photo to QR</h3>
+                    <p class="box-text">Converts photos (`.jpg`, `.png`, `.webp`) into unlisted responsive gallery viewers with pinch-to-zoom and clean layout for posters and art.</p>
+                </div>
+                <div class="glass-box" style="border-top: 3px solid #FF5E62;">
+                    <div class="box-icon" style="color: #FF5E62; background: rgba(255, 94, 98, 0.15);">🎥</div>
+                    <h3 class="box-title">2. Video to QR</h3>
+                    <p class="box-text">Converts instructional videos (`.mp4`, `.mov`, `.webm`) into native HTML5 video streaming players with HTTP 206 partial-content seeking.</p>
+                </div>
+                <div class="glass-box" style="border-top: 3px solid #34D399;">
+                    <div class="box-icon" style="color: #34D399; background: rgba(52, 211, 153, 0.15);">📄</div>
+                    <h3 class="box-title">3. Document to QR</h3>
+                    <p class="box-text">Converts PDFs, Word (`.docx`), Excel, PowerPoint & ZIP files into interactive in-browser PDF readers and single-click download cards.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 5: Product UI & Visuals -->
+        <section class="slide" id="slide-5">
+            <div>
+                <span class="slide-tag">User Experience & Interface</span>
+                <h2 class="slide-title">Glassmorphism Studio & Live Interaction</h2>
+                <p class="slide-desc">Designed with pure Vanilla JS and CSS3 glassmorphism without bloated npm/node frameworks.</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="img-container">
+                    <img src="product_studio_mockup.png" alt="LensQR Studio Mockup">
+                </div>
+                <div class="glass-box" style="justify-content: center;">
+                    <h3 class="box-title">Studio Innovations</h3>
+                    <ul class="feature-list" style="margin-top: 0.8rem;">
+                        <li class="feature-item">
+                            <span class="feature-bullet">✓</span>
+                            <div><strong>Glassy Spacious Inputs:</strong> Semi-transparent backdrop blur (`16px`) with generous padding and ambient focus glow.</div>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">✓</span>
+                            <div><strong>6 Contrast-Safe Color Palettes:</strong> Classic Black, Coral Sunset, Ocean Blue, Emerald, Violet, and Midnight.</div>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">✓</span>
+                            <div><strong>Drag-and-Drop Dropzone:</strong> Real-time progress bar, file size detection, and format icon badges.</div>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">✓</span>
+                            <div><strong>High-Touch Generate Button:</strong> Spacious `340px` click target with ambient backlight glow and tactile feedback.</div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 6: System Architecture & Workflow -->
+        <section class="slide" id="slide-6">
+            <div>
+                <span class="slide-tag">Technical Architecture</span>
+                <h2 class="slide-title">End-to-End System Workflow</h2>
+                <p class="slide-desc">Seamless pipeline connecting creator uploads, security gates, and mobile scanners.</p>
+            </div>
+
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 1rem;">
+                <div class="img-container" style="max-height: 280px;">
+                    <img src="workflow_infographic.png" alt="Workflow Infographic">
+                </div>
+                <div class="grid-3" style="flex: none;">
+                    <div class="glass-box" style="padding: 1rem;">
+                        <strong style="color: #FF5E62;">Layer 1: Security Shield</strong>
+                        <p style="font-size: 0.85rem; color: var(--text-sub); margin-top: 0.3rem;">Magic-byte validation checks binary signatures (`%PDF-`, `PK..`) and blocks executables (`MZ`/ELF).</p>
+                    </div>
+                    <div class="glass-box" style="padding: 1rem;">
+                        <strong style="color: #38BDF8;">Layer 2: Cloudflare Edge</strong>
+                        <p style="font-size: 0.85rem; color: var(--text-sub); margin-top: 0.3rem;">Encrypted outbound tunnel maps local Flask port 5000 to global HTTPS (`trycloudflare.com`).</p>
+                    </div>
+                    <div class="glass-box" style="padding: 1rem;">
+                        <strong style="color: #34D399;">Layer 3: Storage Engine</strong>
+                        <p style="font-size: 0.85rem; color: var(--text-sub); margin-top: 0.3rem;">Atomic thread-safe JSON backup combined with Supabase cloud bucket signed URLs.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 7: Technical Innovations & Security -->
+        <section class="slide" id="slide-7">
+            <div>
+                <span class="slide-tag">Under The Hood</span>
+                <h2 class="slide-title">Key Technical Innovations</h2>
+                <p class="slide-desc">Robust engineering decisions ensuring resilience, security, and low latency.</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="glass-box">
+                    <h3 class="box-title">🛡️ Security & Integrity</h3>
+                    <ul class="feature-list" style="margin-top: 0.5rem;">
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>Magic Byte Inspection:</strong> Reads raw binary stream headers to prevent extension spoofing and Trojan uploads.</div>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>Creator Token Security:</strong> Uploads issue random 256-bit authorization keys; only creators can delete or restyle their media.</div>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>CSRF Defense:</strong> Double-submit CSRF cookie & header validation blocks cross-site request forgery attacks.</div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="glass-box">
+                    <h3 class="box-title">⚡ Performance & Reliability</h3>
+                    <ul class="feature-list" style="margin-top: 0.5rem;">
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>HTTP 206 Partial Content:</strong> Enables instant video scrubbing without forcing mobile users to download full files.</div>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>Atomic JSON Engine:</strong> `os.replace` and `os.fsync` ensure zero file corruption even during unexpected reboots.</div>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>Reed-Solomon QR Resilience:</strong> Level M/Q error correction allows up to 25% physical poster damage without scan failure.</div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 8: Social Impact & Applications -->
+        <section class="slide" id="slide-8">
+            <div>
+                <span class="slide-tag">Social Relevance</span>
+                <h2 class="slide-title">Four Real-World Social Pillars</h2>
+                <p class="slide-desc">Empowering communities through inclusive, accessible, and sustainable digital tools.</p>
+            </div>
+
+            <div class="grid-4">
+                <div class="glass-box">
+                    <div class="box-icon">🎓</div>
+                    <h3 class="box-title" style="font-size: 1.05rem;">Campus & Rural Education</h3>
+                    <p class="box-text" style="font-size: 0.85rem;">Displaying lecture slides, question banks, and lab demonstration videos on physical notice boards for immediate student access.</p>
+                </div>
+                <div class="glass-box">
+                    <div class="box-icon">🏥</div>
+                    <h3 class="box-title" style="font-size: 1.05rem;">Healthcare & Clinics</h3>
+                    <p class="box-text" style="font-size: 0.85rem;">Printing QR codes on discharge forms linking to vernacular video guides (e.g. insulin injection, post-operative care) for patients with low literacy.</p>
+                </div>
+                <div class="glass-box">
+                    <div class="box-icon">🚨</div>
+                    <h3 class="box-title" style="font-size: 1.05rem;">Disaster & Governance</h3>
+                    <p class="box-text" style="font-size: 0.85rem;">Pasting emergency shelter maps, ration distribution schedules, and contact sheets at public transit hubs during crises.</p>
+                </div>
+                <div class="glass-box">
+                    <div class="box-icon">🌿</div>
+                    <h3 class="box-title" style="font-size: 1.05rem;">Green Sustainability</h3>
+                    <p class="box-text" style="font-size: 0.85rem;">Eliminating thousands of single-use paper circulars and pamphlets, saving institutional budget and natural resources.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 9: Testing & Verification -->
+        <section class="slide" id="slide-9">
+            <div>
+                <span class="slide-tag">Rigorous Validation</span>
+                <h2 class="slide-title">Automated Testing & External Verification</h2>
+                <p class="slide-desc">Validated across unit suites and external edge networks without claiming unverified success.</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="glass-box">
+                    <div class="box-icon" style="color: #34D399; background: rgba(52, 211, 153, 0.15);">✅</div>
+                    <h3 class="box-title">34 / 34 Tests Passed</h3>
+                    <p class="box-text">100% test coverage across uploads, magic-byte inspection, Supabase sync, QR styling, URL resolution, and viewer routes (`Ran 34 tests - OK`).</p>
+                </div>
+                <div class="glass-box">
+                    <div class="box-icon" style="color: #38BDF8; background: rgba(56, 189, 248, 0.15);">🌐</div>
+                    <h3 class="box-title">Cloudflare Edge Verified</h3>
+                    <p class="box-text">Tested over live external cellular networks (`CF-Ray: DEL`, `128.185.168.201`), confirming zero localhost loopback errors for external scanners.</p>
+                </div>
+                <div class="glass-box">
+                    <div class="box-icon" style="color: #FF5E62; background: rgba(255, 94, 98, 0.15);">⚡</div>
+                    <h3 class="box-title">Live Multi-Format Tests</h3>
+                    <p class="box-text">Verified sample PDF (`Annual Financial Report 2026.pdf`) and DOCX (`Project Specification.docx`) rendering interactive iframe preview and download cards.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 10: Conclusion & Acknowledgments -->
+        <section class="slide" id="slide-10">
+            <div>
+                <span class="slide-tag">Summary & Next Steps</span>
+                <h2 class="slide-title">Conclusion & Future Roadmap</h2>
+                <p class="slide-desc">LensQR delivers an inclusive, sustainable, and highly accessible solution to the physical-digital divide.</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="glass-box">
+                    <h3 class="box-title">🚀 Future Scope</h3>
+                    <ul class="feature-list" style="margin-top: 0.5rem;">
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>Expiring QR Codes:</strong> Time-to-live (TTL) countdown for self-deleting daily circulars.</div>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>Audio QR Support:</strong> Adding MP3 streaming for museum audio tours and visually impaired students.</div>
+                        </li>
+                        <li class="feature-item">
+                            <span class="feature-bullet">•</span>
+                            <div><strong>Offline Mesh Mode:</strong> Running on a Raspberry Pi local Wi-Fi hotspot in remote disaster zones.</div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="glass-box" style="justify-content: center; text-align: center; border-color: rgba(255, 94, 98, 0.3);">
+                    <h3 class="box-title" style="font-size: 1.5rem; margin-bottom: 0.6rem;">Thank You!</h3>
+                    <p class="box-text" style="margin-bottom: 1.5rem;">We welcome questions and suggestions from respected examiners and faculty.</p>
+                    <div style="display: inline-flex; gap: 0.8rem; justify-content: center;">
+                        <span class="brand-tag">Q&A Session</span>
+                        <span class="brand-tag">Live Demonstration Ready</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Bottom Footer Navigation -->
+    <footer class="pres-footer">
+        <span style="font-size: 0.85rem; color: var(--text-sub);">Use <strong>← / →</strong> Arrow Keys or buttons to navigate slides</span>
+        <div class="nav-btns">
+            <button type="button" class="btn-nav btn-prev" id="prevBtn" onclick="prevSlide()">← Previous</button>
+            <button type="button" class="btn-nav btn-next" id="nextBtn" onclick="nextSlide()">Next Slide →</button>
+        </div>
+    </footer>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 10;
+
+        function showSlide(n) {
+            if (n < 1) n = 1;
+            if (n > totalSlides) n = totalSlides;
+            currentSlide = n;
+
+            document.querySelectorAll('.slide').forEach((slide, idx) => {
+                slide.classList.toggle('active', (idx + 1) === currentSlide);
+            });
+
+            document.getElementById('slideIndicator').textContent = `Slide ${currentSlide} / ${totalSlides}`;
+            document.getElementById('prevBtn').disabled = (currentSlide === 1);
+            document.getElementById('nextBtn').textContent = (currentSlide === totalSlides) ? 'Finish ↺' : 'Next Slide →';
+        }
+
+        function nextSlide() {
+            if (currentSlide === totalSlides) {
+                showSlide(1);
+            } else {
+                showSlide(currentSlide + 1);
+            }
+        }
+
+        function prevSlide() {
+            showSlide(currentSlide - 1);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            }
+        });
+
+        // Fullscreen Toggle
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
+        }
+    </script>
+</body>
+</html>

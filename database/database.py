@@ -151,8 +151,8 @@ def validate_record(record):
         missing_str = ', '.join(sorted(missing))
         raise ValueError(f"Record is missing required fields: {missing_str}")
 
-    if record['type'] not in ['photo', 'video']:
-        raise ValueError("Record 'type' must be 'photo' or 'video'.")
+    if record['type'] not in ['photo', 'video', 'document']:
+        raise ValueError("Record 'type' must be 'photo', 'video', or 'document'.")
 
     if not isinstance(record['id'], str) or not record['id'].strip():
         raise ValueError("Record 'id' must be a non-empty string.")
