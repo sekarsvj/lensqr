@@ -20,7 +20,9 @@ from services.qr_service import STYLE_PALETTES
 
 def create_app(test_config=None):
     """Application factory for the Photo & Video QR Generator."""
-    app = Flask(__name__)
+    templates_dir = os.path.join(Config.BASE_DIR, 'templates')
+    static_dir = os.path.join(Config.BASE_DIR, 'static')
+    app = Flask(__name__, template_folder=templates_dir, static_folder=static_dir)
     app.config.from_object(Config)
 
     if test_config:
@@ -172,6 +174,7 @@ def create_app(test_config=None):
 
     # Core Routes
     @app.route('/')
+    @app.route('/api/index')
     def index():
         """Homepage: Photo & Video QR Generator Studio."""
         return render_template('index.html')
