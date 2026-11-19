@@ -173,8 +173,8 @@ def create_app(test_config=None):
         ), 413
 
     # Core Routes
-    @app.route('/')
-    @app.route('/api/index')
+    @app.route('/', strict_slashes=False)
+    @app.route('/api/index', strict_slashes=False)
     def index():
         """Homepage: Photo & Video QR Generator Studio."""
         return render_template('index.html')
