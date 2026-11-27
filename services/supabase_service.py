@@ -78,7 +78,9 @@ def _normalize_db_record(row: Any) -> Dict[str, Any]:
     storage_path = (
         row.get("storage_path") or row.get("filename") or ""
     )
-    if storage_path.startswith("documents/") or (row.get("mime_type") and not row.get("mime_type").startswith(("image/", "video/"))):
+    if storage_path.startswith("links/") or row.get("mime_type") == "text/uri-list":
+        media_type = "url"
+    elif storage_path.startswith("documents/") or (row.get("mime_type") and not row.get("mime_type").startswith(("image/", "video/"))):
         media_type = "document"
     local_filename = os.path.basename(storage_path) if storage_path else ""
     original_name = (
@@ -93,8 +95,9 @@ def _normalize_db_record(row: Any) -> Dict[str, Any]:
         "type": media_type,
         "media_type": media_type,
         "title": row.get("title") or (
-            "Photo" if media_type == "photo" else ("Video" if media_type == "video" else "Document")
+            "Photo" if media_type == "photo" else ("Video" if media_type == "video" else ("Web Link" if media_type == "url" else "Document"))
         ),
+        "target_url": row.get("target_url") or (original_name if media_type == "url" else ""),
         "description": row.get("description") or "",
         "original_name": original_name,
         "original_filename": original_name,
@@ -158,10 +161,10 @@ def save_media_to_db(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return _normalize_db_record(row_data)
     except Exception as e:
         err_msg = str(e)
-        if "media_media_type_check" in err_msg and media_type == "document":
+        if "media_media_type_check" in err_msg and media_type in ("document", "url"):
             logger.warning(
-                "Remote Supabase DB has legacy media_type constraint. "
-                "Saving document with DB-fallback media_type='photo' and documents storage_path."
+                f"Remote Supabase DB has legacy media_type constraint. "
+                f"Saving {media_type} with DB-fallback media_type='photo' and storage_path."
             )
             try:
                 fallback_data = dict(row_data)
@@ -169,12 +172,16 @@ def save_media_to_db(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 res = client.table("media").upsert(fallback_data).execute()
                 if res.data and len(res.data) > 0:
                     norm = _normalize_db_record(res.data[0])
-                    norm["type"] = "document"
-                    norm["media_type"] = "document"
+                    norm["type"] = media_type
+                    norm["media_type"] = media_type
                     return norm
                 norm = _normalize_db_record(fallback_data)
-                norm["type"] = "document"
-                norm["media_type"] = "document"
+                norm["type"] = media_type
+                norm["media_type"] = media_type
+                return norm
+            except Exception as inner_e:
+                logger.error(f"Fallback save to Supabase also failed: {inner_e}")
+                return None
                 return norm
             except Exception as inner_e:
                 logger.error(f"Fallback save to Supabase also failed: {inner_e}")

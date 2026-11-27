@@ -101,14 +101,16 @@ function updateNavBadge() {
     }
 }
 
-// Mode Switcher (Photo vs Video vs Document)
+// Mode Switcher (Photo vs Video vs Document vs URL)
 function initModeSwitcher() {
     const tabPhoto = document.getElementById('tabPhoto');
     const tabVideo = document.getElementById('tabVideo');
     const tabDocument = document.getElementById('tabDocument');
+    const tabUrl = document.getElementById('tabUrl');
     const panelPhoto = document.getElementById('panelPhoto');
     const panelVideo = document.getElementById('panelVideo');
     const panelDocument = document.getElementById('panelDocument');
+    const panelUrl = document.getElementById('panelUrl');
 
     if (!tabPhoto || !tabVideo) return;
 
@@ -116,10 +118,12 @@ function initModeSwitcher() {
         tabPhoto.classList.remove('active');
         tabVideo.classList.remove('active');
         if (tabDocument) tabDocument.classList.remove('active');
+        if (tabUrl) tabUrl.classList.remove('active');
 
         panelPhoto.style.display = 'none';
         panelVideo.style.display = 'none';
         if (panelDocument) panelDocument.style.display = 'none';
+        if (panelUrl) panelUrl.style.display = 'none';
 
         if (mode === 'photo') {
             tabPhoto.classList.add('active');
@@ -133,6 +137,10 @@ function initModeSwitcher() {
             tabDocument.classList.add('active');
             panelDocument.style.display = 'block';
             window.location.hash = 'document-section';
+        } else if (mode === 'url' && panelUrl) {
+            tabUrl.classList.add('active');
+            panelUrl.style.display = 'block';
+            window.location.hash = 'url-section';
         }
     }
 
@@ -141,11 +149,16 @@ function initModeSwitcher() {
     if (tabDocument) {
         tabDocument.addEventListener('click', () => switchMode('document'));
     }
+    if (tabUrl) {
+        tabUrl.addEventListener('click', () => switchMode('url'));
+    }
 
     if (window.location.hash === '#video-section') {
         switchMode('video');
     } else if (window.location.hash === '#document-section') {
         switchMode('document');
+    } else if (window.location.hash === '#url-section') {
+        switchMode('url');
     }
 }
 
@@ -619,7 +632,14 @@ function renderMyCodes() {
         card.id = `card-${item.mediaId}`;
 
         const isPhoto = item.mediaType === 'photo';
-        const typeLabel = isPhoto ? 'Photo' : 'Video';
+        const isVideo = item.mediaType === 'video';
+        const isDoc = item.mediaType === 'document';
+        const isUrl = item.mediaType === 'url';
+        let typeLabel = 'Photo';
+        if (isVideo) typeLabel = 'Video';
+        else if (isDoc) typeLabel = 'Document';
+        else if (isUrl) typeLabel = 'Link';
+
         const createdDate = item.createdAt ? new Date(item.createdAt).toLocaleDateString(undefined, {
             month: 'short', day: 'numeric', year: 'numeric'
         }) : 'Recently';
@@ -639,7 +659,7 @@ function renderMyCodes() {
                 <div class="code-card-actions">
                     <a href="/m/${item.mediaId}" target="_blank" rel="noopener" class="btn btn-secondary btn-xs">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                        View Media
+                        ${isUrl ? 'Open Link' : 'View Media'}
                     </a>
                     <a href="/download-qr/${item.mediaId}" download class="btn btn-secondary btn-xs">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -950,6 +970,120 @@ function initDocumentUpload() {
     });
 }
 
+// URL to QR Upload & Generation Handler
+function initUrlUpload() {
+    const form = document.getElementById('urlUploadForm');
+    const urlInput = document.getElementById('urlInput');
+    const submitBtn = document.getElementById('submitUrlBtn');
+    const progressWrap = document.getElementById('urlProgressWrap');
+    const progressBar = document.getElementById('urlProgressBar');
+    const progressPercent = document.getElementById('urlProgressPercent');
+    const progressStatus = document.getElementById('urlProgressStatus');
+    const stylePicker = document.getElementById('urlStylePicker');
+    const styleHidden = document.getElementById('urlQrStyle');
+
+    if (!form || !urlInput) return;
+
+    // Palette pill switcher
+    if (stylePicker && styleHidden) {
+        const pills = stylePicker.querySelectorAll('.style-pill');
+        pills.forEach(pill => {
+            pill.addEventListener('click', () => {
+                pills.forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                styleHidden.value = pill.getAttribute('data-style');
+            });
+        });
+    }
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const rawUrl = urlInput.value.trim();
+        if (!rawUrl) {
+            showToast('Please enter a website link or URL.', 'error');
+            urlInput.focus();
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<div class="spinner-sm"></div><span>Generating QR Code...</span>`;
+        if (progressWrap) {
+            progressWrap.style.display = 'block';
+            if (progressBar) progressBar.style.width = '45%';
+            if (progressPercent) progressPercent.textContent = '45%';
+            if (progressStatus) progressStatus.textContent = 'Creating link record & styling QR...';
+        }
+
+        const formData = new FormData(form);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', form.action, true);
+        xhr.setRequestHeader('X-CSRFToken', getCsrfToken());
+
+        xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        if (progressBar) progressBar.style.width = '100%';
+                        if (progressPercent) progressPercent.textContent = '100%';
+                        if (progressStatus) progressStatus.textContent = 'QR Code generated!';
+
+                        saveMediaToLocalStorage({
+                            mediaId: data.media_id,
+                            title: data.title || rawUrl,
+                            mediaType: 'url',
+                            targetUrl: data.target_url || rawUrl,
+                            mediaUrl: data.media_url,
+                            qrUrl: data.qr_url,
+                            resultUrl: data.result_url,
+                            creatorToken: data.creator_token,
+                            sizeFormatted: 'Web Link',
+                            createdAt: new Date().toISOString()
+                        });
+
+                        showToast('Link QR Code generated successfully!', 'success');
+                        window.location.href = data.result_url;
+                    } else {
+                        showToast(data.error || 'Failed to generate QR code.', 'error');
+                        resetSubmit();
+                    }
+                } catch (err) {
+                    showToast('Failed to parse server response.', 'error');
+                    resetSubmit();
+                }
+            } else {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    showToast(data.error || `Request failed with status ${xhr.status}`, 'error');
+                } catch {
+                    showToast(`Server returned status ${xhr.status}`, 'error');
+                }
+                resetSubmit();
+            }
+        };
+
+        xhr.onerror = () => {
+            showToast('Network error while generating QR code.', 'error');
+            resetSubmit();
+        };
+
+        function resetSubmit() {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="20" height="20">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                <span>Generate Link QR Code</span>
+            `;
+            if (progressWrap) progressWrap.style.display = 'none';
+        }
+
+        xhr.send(formData);
+    });
+}
+
 // Global DOM Ready Initialization
 document.addEventListener('DOMContentLoaded', () => {
     updateNavBadge();
@@ -957,5 +1091,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initPhotoUpload();
     initVideoUpload();
     initDocumentUpload();
+    initUrlUpload();
     initResultPage();
 });

@@ -36,7 +36,7 @@
                     
                     <a href="{{ media_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-block">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                        <span>Preview Media</span>
+                        <span>{% if media.type == 'url' %}Open Link / Viewer{% else %}Preview Media{% endif %}</span>
                     </a>
                 </div>
 
@@ -67,8 +67,8 @@
                     <label class="detail-label">Media Information</label>
                     <div class="meta-specs-grid">
                         <div class="spec-card">
-                            <span class="spec-name">Original File</span>
-                            <span class="spec-value truncate" title="{{ media.original_name }}">{{ media.original_name }}</span>
+                            <span class="spec-name">{% if media.type == 'url' %}Destination URL{% else %}Original File{% endif %}</span>
+                            <span class="spec-value truncate" title="{{ media.target_url or media.original_name }}">{{ media.target_url or media.original_name }}</span>
                         </div>
                         <div class="spec-card">
                             <span class="spec-name">Media Type</span>

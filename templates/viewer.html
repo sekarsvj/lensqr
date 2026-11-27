@@ -16,6 +16,13 @@
                     {% elif media.type == 'video' or media.media_type == 'video' %}
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
                     <span>Video</span>
+                    {% elif media.type == 'url' or media.media_type == 'url' %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                    <span>Web Link</span>
                     {% else %}
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -48,10 +55,17 @@
             </div>
 
             <div class="viewer-header-actions">
+                {% if media.type == 'url' or media.media_type == 'url' %}
+                <a href="{{ media.target_url or media.filename or media.original_name }}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" title="Visit website">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                    <span>Open Link</span>
+                </a>
+                {% else %}
                 <a href="{{ url_for('serve_media_file', media_id=media.id) }}" download="{{ media.original_name }}" class="btn btn-secondary btn-sm" title="Download original file">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                     <span>Download</span>
                 </a>
+                {% endif %}
                 <a href="{{ url_for('index') }}" class="btn btn-primary btn-sm">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                     <span>Create Your Own QR</span>
@@ -94,6 +108,69 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                         <span>Download Video</span>
                     </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- URL / WEB LINK VIEWER CONTENT -->
+        {% elif media.type == 'url' or media.media_type == 'url' %}
+        <div class="url-viewer-card">
+            <div class="url-card-hero">
+                <div class="url-hero-icon-wrap">
+                    <div class="url-radar-pulse"></div>
+                    <div class="url-icon-circle">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="40" height="40">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="2" y1="12" x2="22" y2="12"></line>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <div class="url-destination-badge">
+                    <span class="url-dot"></span>
+                    <span>Verified Web Destination</span>
+                </div>
+
+                <h2 class="url-hero-heading">{{ media.title or "Web Link" }}</h2>
+
+                {% if media.description %}
+                <p class="url-hero-description">{{ media.description }}</p>
+                {% endif %}
+
+                <!-- Target URL Box -->
+                <div class="url-target-box">
+                    <span class="url-target-label">Target Address:</span>
+                    <a href="{{ media.target_url or media.filename or media.original_name }}" class="url-target-link" target="_blank" rel="noopener noreferrer" id="targetLink">
+                        <span class="url-link-text">{{ media.target_url or media.filename or media.original_name }}</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                    </a>
+                </div>
+
+                <!-- Auto-redirect banner -->
+                <div class="url-redirect-banner" id="redirectBanner">
+                    <div class="redirect-countdown-text">
+                        Opening destination in <strong id="redirectSeconds">4</strong> seconds...
+                    </div>
+                    <div class="redirect-bar-track">
+                        <div class="redirect-bar-fill" id="redirectBarFill"></div>
+                    </div>
+                    <button type="button" class="btn-cancel-redirect" id="cancelRedirectBtn">Stay on Preview Page</button>
+                </div>
+
+                <!-- Primary Action Button -->
+                <div class="url-action-cta">
+                    <a href="{{ media.target_url or media.filename or media.original_name }}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-lg url-visit-btn" id="directVisitBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="20" height="20">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                        <span>Visit Website / Open Link</span>
+                    </a>
+                    <button type="button" class="btn btn-secondary btn-lg" id="copyDestinationBtn" data-copy="{{ media.target_url or media.filename or media.original_name }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        <span id="copyBtnText">Copy URL</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -162,4 +239,83 @@
 
     </div>
 </section>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if media.type == 'url' or media.media_type == 'url' %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const destUrl = "{{ media.target_url or media.filename or media.original_name }}";
+        const redirectBanner = document.getElementById('redirectBanner');
+        const redirectSeconds = document.getElementById('redirectSeconds');
+        const redirectBarFill = document.getElementById('redirectBarFill');
+        const cancelBtn = document.getElementById('cancelRedirectBtn');
+        const copyBtn = document.getElementById('copyDestinationBtn');
+        const copyText = document.getElementById('copyBtnText');
+
+        let secondsRemaining = 4;
+        let isCancelled = false;
+
+        if (redirectBarFill) {
+            redirectBarFill.style.transition = 'width 4s linear';
+            requestAnimationFrame(() => {
+                redirectBarFill.style.width = '100%';
+            });
+        }
+
+        const countdownInterval = setInterval(() => {
+            if (isCancelled) {
+                clearInterval(countdownInterval);
+                return;
+            }
+            secondsRemaining -= 1;
+            if (redirectSeconds) {
+                redirectSeconds.textContent = secondsRemaining;
+            }
+            if (secondsRemaining <= 0) {
+                clearInterval(countdownInterval);
+                if (!isCancelled && destUrl) {
+                    window.location.href = destUrl;
+                }
+            }
+        }, 1000);
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                isCancelled = true;
+                clearInterval(countdownInterval);
+                if (redirectBanner) {
+                    redirectBanner.classList.add('cancelled');
+                    redirectBanner.innerHTML = '<span class="redirect-cancelled-notice">Auto-redirect stopped. Explore or click "Visit Website" above.</span>';
+                }
+            });
+        }
+
+        if (copyBtn) {
+            copyBtn.addEventListener('click', async () => {
+                const text = copyBtn.getAttribute('data-copy');
+                if (!text) return;
+                try {
+                    await navigator.clipboard.writeText(text);
+                    if (copyText) copyText.textContent = 'Copied!';
+                    setTimeout(() => {
+                        if (copyText) copyText.textContent = 'Copy URL';
+                    }, 2500);
+                } catch (e) {
+                    const tempInput = document.createElement('input');
+                    tempInput.value = text;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempInput);
+                    if (copyText) copyText.textContent = 'Copied!';
+                    setTimeout(() => {
+                        if (copyText) copyText.textContent = 'Copy URL';
+                    }, 2500);
+                }
+            });
+        }
+    });
+</script>
+{% endif %}
 {% endblock %}

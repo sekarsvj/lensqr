@@ -108,6 +108,79 @@ def create_media(
     return record
 
 
+def create_url_media(
+    target_link: str,
+    title: str,
+    description: str,
+    qr_style: str,
+    public_base_url: str
+) -> Dict[str, Any]:
+    """
+    Validate web URL, generate a high-resolution QR code pointing to
+    the branded viewer, and persist metadata to Supabase PostgreSQL
+    (with local JSON sync).
+    """
+    clean_url = target_link.strip() if target_link else ''
+    if not clean_url:
+        raise ValueError("URL cannot be empty.")
+
+    # Auto-prepend https:// if protocol is missing
+    if not (clean_url.startswith("http://") or clean_url.startswith("https://")):
+        clean_url = "https://" + clean_url
+
+    media_id = str(uuid.uuid4())
+    creator_token = generate_creator_token()
+
+    # Target URL encoded in QR code pointing to Flask viewer
+    viewer_target = f"{public_base_url}/m/{media_id}"
+
+    # Generate QR code and sync to Supabase Storage
+    qr_filename = generate_qr_code(viewer_target, media_id, style=qr_style)
+    qr_storage_path = f"qr-codes/{qr_filename}"
+
+    media_title = title.strip() if title else clean_url
+    url_bytes_len = len(clean_url.encode('utf-8'))
+
+    # Construct unified metadata record
+    record = {
+        'id': media_id,
+        'creator_token': creator_token,
+        'type': 'url',
+        'media_type': 'url',
+        'title': media_title,
+        'description': description.strip() if description else '',
+        'target_url': clean_url,
+        'original_name': clean_url,
+        'original_filename': clean_url,
+        'filename': clean_url,
+        'storage_path': f"links/{media_id}.url",
+        'mime_type': 'text/uri-list',
+        'size_bytes': url_bytes_len,
+        'file_size': url_bytes_len,
+        'qr_filename': qr_filename,
+        'qr_code_path': qr_storage_path,
+        'qr_style': qr_style,
+        'access': 'unlisted',
+        'views_count': 0,
+        'is_active': True,
+        'created_at': datetime.now(timezone.utc).isoformat()
+    }
+
+    # Persist to Supabase PostgreSQL if available
+    if is_supabase_available():
+        db_res = save_media_to_db(record)
+        if db_res:
+            record.update(db_res)
+
+    # Maintain local JSON storage as backup/cache
+    try:
+        save_local_media(record)
+    except Exception as e:
+        print(f"Notice: Local JSON sync skipped: {e}")
+
+    return record
+
+
 def get_media(media_id: str) -> Optional[Dict[str, Any]]:
     """
     Retrieve media metadata by ID. Queries Supabase PostgreSQL first,
@@ -212,9 +285,12 @@ def get_signed_media_url(
     if not record:
         return None
 
+    mtype = record.get('type') or record.get('media_type') or 'photo'
+    if mtype == 'url':
+        return record.get('target_url') or record.get('filename') or record.get('original_name')
+
     storage_path = record.get('storage_path')
     if not storage_path:
-        mtype = record.get('type') or record.get('media_type') or 'photo'
         if mtype == 'photo':
             subfolder = 'photos'
         elif mtype == 'video':
@@ -235,10 +311,13 @@ def format_media_dict(
 
     media_id = record['id']
     media_type = record.get('type') or record.get('media_type') or 'photo'
+    target_link = record.get('target_url') or (record.get('original_name') if media_type == 'url' else '')
     if media_type == 'photo':
         default_title = 'Photo'
     elif media_type == 'video':
         default_title = 'Video'
+    elif media_type == 'url':
+        default_title = target_link or 'Web Link'
     else:
         default_title = record.get('original_name') or 'Document'
     size_val = record.get('size_bytes') or record.get('file_size') or 0
@@ -249,6 +328,7 @@ def format_media_dict(
         'media_type': media_type,
         'title': record.get('title') or default_title,
         'description': record.get('description', ''),
+        'target_url': target_link,
         'original_name': record.get('original_name') or record.get(
             'original_filename', ''
         ),
@@ -259,7 +339,9 @@ def format_media_dict(
         'qr_style': record.get('qr_style', 'classic'),
         'qr_url': f"{public_base_url}/qr-image/{record.get('qr_filename')}",
         'media_url': f"{public_base_url}/m/{media_id}",
-        'file_url': f"{public_base_url}/media-file/{media_id}",
+        'file_url': (
+            target_link if media_type == 'url' else f"{public_base_url}/media-file/{media_id}"
+        ),
         'created_at': record.get('created_at')
     }
 

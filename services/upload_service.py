@@ -251,7 +251,7 @@ def delete_uploaded_file(filename, media_type, storage_path=None):
     """
     Safely delete an uploaded file from disk and private Supabase Storage.
     """
-    if not filename:
+    if not filename or media_type == 'url':
         return
 
     # Delete from local filesystem

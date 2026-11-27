@@ -11,7 +11,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from database.database import initialize_storage, get_media, format_file_size
 from services.media_service import (
-    create_media, update_media_qr_style,
+    create_media, create_url_media, update_media_qr_style,
     delete_media_and_files, format_media_dict,
     get_signed_media_url, regenerate_all_qr_codes
 )
@@ -323,6 +323,65 @@ def create_app(test_config=None):
             return jsonify(
                 {'success': False, 'error': f'Upload failed: {str(e)}'}), 500
 
+    @app.route('/upload/url', methods=['POST'])
+    def upload_url():
+        """Create a QR code pointing to a web URL / link."""
+        try:
+            if request.is_json and request.json:
+                data = request.json
+                url_input = data.get('url', '').strip()
+                title = data.get('title', '').strip()
+                description = data.get('description', '').strip()
+                qr_style = data.get('qr_style', 'classic')
+            else:
+                url_input = request.form.get('url', '').strip()
+                title = request.form.get('title', '').strip()
+                description = request.form.get('description', '').strip()
+                qr_style = request.form.get('qr_style', 'classic')
+
+            if not url_input:
+                return jsonify({
+                    'success': False,
+                    'error': 'Please enter a valid website URL or link.'
+                }), 400
+
+            # Normalize protocol
+            if not (url_input.startswith("http://") or url_input.startswith("https://")):
+                url_input = "https://" + url_input
+
+            record = create_url_media(
+                target_link=url_input,
+                title=title,
+                description=description,
+                qr_style=qr_style,
+                public_base_url=get_public_base_url()
+            )
+
+            # Store creator token in session
+            tokens = session.get('creator_tokens', [])
+            tokens.append(record['creator_token'])
+            session['creator_tokens'] = tokens
+            session.modified = True
+
+            base_url = get_public_base_url()
+            return jsonify({
+                'success': True,
+                'media_id': record['id'],
+                'creator_token': record['creator_token'],
+                'title': record['title'],
+                'media_type': 'url',
+                'target_url': record.get('target_url', url_input),
+                'media_url': f"{base_url}/m/{record['id']}",
+                'qr_url': url_for(
+                    'serve_qr_image', filename=record['qr_filename']),
+                'result_url': url_for('qr_result', media_id=record['id'])
+            })
+        except ValueError as ve:
+            return jsonify({'success': False, 'error': str(ve)}), 400
+        except Exception as e:
+            return jsonify(
+                {'success': False, 'error': f'Failed to create QR code: {str(e)}'}), 500
+
     @app.route('/result/<media_id>')
     def qr_result(media_id):
         """
@@ -399,8 +458,14 @@ def create_app(test_config=None):
             if signed_url:
                 return redirect(signed_url, code=307)
 
-        safe_filename = os.path.basename(record['filename'])
         media_type = record.get('type') or record.get('media_type') or 'photo'
+        if media_type == 'url':
+            target = record.get('target_url') or record.get('filename') or record.get('original_name')
+            if target:
+                return redirect(target, code=302)
+            abort(404)
+
+        safe_filename = os.path.basename(record['filename'])
         if media_type == 'photo':
             folder = app.config.get(
                 'UPLOAD_FOLDER_PHOTOS',

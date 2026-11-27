@@ -10,10 +10,10 @@
             <span>Dedicated Media QR Generator</span>
         </div>
         <h1 class="hero-title">
-            Transform Photos, Videos & Documents into <span class="gradient-text">Scan-Ready QR Codes</span>
+            Transform Photos, Videos, Documents & Links into <span class="gradient-text">Scan-Ready QR Codes</span>
         </h1>
         <p class="hero-subtitle">
-            Create high-resolution QR codes linking directly to unlisted, mobile-optimized photo viewers, native HTML5 video players, or instant document previews (PDF, Word, Excel & more). Instant camera scanning with zero app installations.
+            Create high-resolution QR codes linking directly to unlisted, mobile-optimized photo viewers, native HTML5 video players, instant document previews (PDF, Word, Excel & more), or custom web links. Instant camera scanning with zero app installations.
         </p>
 
         <!-- Mode Selector Switcher -->
@@ -42,6 +42,13 @@
                     <polyline points="10 9 9 9 8 9"></polyline>
                 </svg>
                 <span>Document to QR</span>
+            </button>
+            <button type="button" class="mode-tab" data-mode="url" id="tabUrl">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                <span>URL to QR</span>
             </button>
         </div>
     </div>
@@ -370,6 +377,94 @@
                             <polyline points="14 2 14 8 20 8"></polyline>
                         </svg>
                         <span>Generate Document QR Code</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- URL / WEB LINK PANEL -->
+        <div class="mode-panel" id="panelUrl">
+            <div class="panel-header">
+                <div>
+                    <h2 class="panel-title">Convert URL / Link to QR</h2>
+                    <p class="panel-subtitle">Enter any web address, article, portfolio, social profile, or website link to create a custom QR code.</p>
+                </div>
+                <div class="format-chips">
+                    <span class="chip">Websites</span>
+                    <span class="chip">Articles</span>
+                    <span class="chip">Portfolios</span>
+                    <span class="chip">Social Links</span>
+                    <span class="chip chip-limit">Any Valid Link</span>
+                </div>
+            </div>
+
+            <form id="urlUploadForm" class="upload-form" action="{{ url_for('upload_url') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                <!-- URL Input Card -->
+                <div class="url-input-card">
+                    <div class="url-input-wrapper">
+                        <div class="url-icon-badge">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                        </div>
+                        <div class="url-field-group">
+                            <label for="urlInput" class="form-label">Destination Website URL or Link <span class="required-mark">*</span></label>
+                            <input type="text" id="urlInput" name="url" class="form-input form-control url-main-input" placeholder="https://example.com/portfolio or github.com/username" required autocomplete="off">
+                            <span class="url-helper-hint">Accepts any website link, Google Drive link, social profile, YouTube link, etc. (https:// is added automatically if omitted)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- URL Metadata Fields -->
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="urlTitle" class="form-label">Link Title <span class="optional">(Optional)</span></label>
+                        <input type="text" id="urlTitle" name="title" class="form-input form-control" placeholder="e.g. My Portfolio, Company Website, Conference Schedule" maxlength="100">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="urlDescription" class="form-label">Note / Description <span class="optional">(Optional)</span></label>
+                        <textarea id="urlDescription" name="description" class="form-textarea form-control" placeholder="Add an optional message or introduction for scanners..." rows="2" maxlength="300"></textarea>
+                    </div>
+                </div>
+
+                <!-- QR Style Palette Picker for URL -->
+                <div class="form-group">
+                    <label class="form-label">QR Code Color Palette</label>
+                    <div class="style-picker" id="urlStylePicker">
+                        {% for key, val in qr_styles.items() %}
+                        <button type="button" class="style-pill {% if key == 'classic' %}active{% endif %}" data-style="{{ key }}">
+                            <span class="pill-dot" style="background-color: {{ val.fill_color }};"></span>
+                            <span class="pill-label">{{ val.name }}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" name="qr_style" id="urlQrStyle" value="classic">
+                </div>
+
+                <!-- Progress Bar Container -->
+                <div class="upload-progress-wrap" id="urlProgressWrap" style="display: none;">
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="urlProgressBar"></div>
+                    </div>
+                    <div class="progress-meta">
+                        <span id="urlProgressStatus">Generating QR code...</span>
+                        <span id="urlProgressPercent">0%</span>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="form-submit">
+                    <button type="submit" class="btn btn-primary btn-lg" id="submitUrlBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="20" height="20">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                        <span>Generate Link QR Code</span>
                     </button>
                 </div>
             </form>
