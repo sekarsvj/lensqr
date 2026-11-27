@@ -1,5 +1,6 @@
 import os
 import secrets
+import urllib.parse
 from datetime import datetime
 from flask import (
     Flask, render_template, request, jsonify,
@@ -16,6 +17,40 @@ from services.media_service import (
     get_signed_media_url, regenerate_all_qr_codes
 )
 from services.qr_service import STYLE_PALETTES
+
+
+class VercelPathFixer:
+    """
+    WSGI middleware for Vercel Serverless routing.
+    Extracts the matched path from the __path__ rewrite parameter,
+    or from x-matched-path header, restoring PATH_INFO so Flask routing
+    and HTTP methods (POST, GET) work properly on all routes.
+    """
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        query = environ.get('QUERY_STRING', '')
+        params = urllib.parse.parse_qs(query)
+
+        # 1. First priority: __path__ from vercel.json rewrite
+        if '__path__' in params:
+            raw_path = params['__path__'][0] if params['__path__'] else ''
+            target_path = '/' + raw_path.lstrip('/') if raw_path else '/'
+            environ['PATH_INFO'] = target_path
+
+            # Clean __path__ parameter out of QUERY_STRING
+            clean_params = {k: v for k, v in params.items() if k != '__path__'}
+            environ['QUERY_STRING'] = urllib.parse.urlencode(clean_params, doseq=True)
+        # 2. Second priority: If PATH_INFO is /api/index, check X-Matched-Path or X-Forwarded-Uri
+        elif environ.get('PATH_INFO') in ('/api/index', '/api/index/'):
+            matched = environ.get('HTTP_X_MATCHED_PATH', '') or environ.get('HTTP_X_FORWARDED_URI', '')
+            if matched and matched not in ('/api/index', '/api/index/'):
+                environ['PATH_INFO'] = matched
+            else:
+                environ['PATH_INFO'] = '/'
+
+        return self.wsgi_app(environ, start_response)
 
 
 def create_app(test_config=None):
@@ -37,6 +72,8 @@ def create_app(test_config=None):
         x_port=1,
         x_prefix=1
     )
+    # Restore actual PATH_INFO from Vercel rewrite or proxy headers
+    app.wsgi_app = VercelPathFixer(app.wsgi_app)
 
     # Cookie security settings
     app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -146,6 +183,14 @@ def create_app(test_config=None):
                 'error': 'Requested resource was not found.'
             }), 404
         return render_template('404.html'), 404
+
+    @app.errorhandler(405)
+    def handle_method_not_allowed(error):
+        """Render JSON 405 error with descriptive path and method."""
+        return jsonify({
+            'success': False,
+            'error': f'Method {request.method} is not allowed on {request.path}.'
+        }), 405
 
     @app.errorhandler(500)
     def handle_server_error(error):
