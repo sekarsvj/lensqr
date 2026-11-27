@@ -21,9 +21,9 @@ class VercelPathFixer:
         self.wsgi_app = wsgi_app
 
     def __call__(self, environ, start_response):
-        if environ.get('HTTP_X_DEBUG_ENV') == '1':
+        if '__debug__' in environ.get('QUERY_STRING', '') or environ.get('HTTP_X_DEBUG_ENV') == '1':
             import json
-            headers_dict = {k: str(v) for k, v in environ.items() if isinstance(v, (str, int, float, bool))}
+            headers_dict = {k: str(v) for k, v in environ.items() if not k.startswith('wsgi.')}
             start_response('200 OK', [('Content-Type', 'application/json')])
             return [json.dumps(headers_dict, indent=2).encode('utf-8')]
 
